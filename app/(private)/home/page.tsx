@@ -464,11 +464,11 @@ export default function Home() {
         .then((res) => res); 
 
 
-        if(responseValidHours && responseValidHours[0] < responseValidHours[1]) {
+        if(responseValidHours && responseValidHours[0] < responseValidHours[1] && responseValidHours[2] !== "SIM") {
 
             let horasTotais =  responseValidHours[0] / 60
             //let horasApontadas = responseValidHours[1] / 60
-
+            console.log("TESTE")
             const confirmacao = await Swal.fire({
                 title: `Horas mês: ${horasTotais}h`,
                 text: `Horas para está Tarefa já ultrapassaram o limite, impossível realizar o apontamento.`,
@@ -563,7 +563,7 @@ export default function Home() {
         .then((res) => res);
 
 
-        if(responseValidHours && responseValidHours[0]>0 && responseValidHours[0] < responseValidHours[1]) {
+        if(responseValidHours && responseValidHours[0]>0 && responseValidHours[0] < responseValidHours[1] && responseValidHours[2] !== "SIM") {
 
             let horasTotais =  responseValidHours[0] / 60
             let horasApontadas = responseValidHours[1] / 60

@@ -24,15 +24,15 @@ export default async function ValidHoursService(
                 })
             })
 
-            let [codTarefa, limmesTarefa]: [codTarefa: string, limmesTarefa: string] = await new Promise((resolve, reject) => {
+            let [codTarefa, limmesTarefa, perimpTarefa]: [codTarefa: string, limmesTarefa: string, perimpTarefa: string] = await new Promise((resolve, reject) => {
 
-                db.query(`SELECT COD_TAREFA, HRREAL_TAREFA FROM TAREFA WHERE COD_TAREFA = ?`,
+                db.query(`SELECT COD_TAREFA, HRREAL_TAREFA, PERIMP_TAREFA FROM TAREFA WHERE COD_TAREFA = ?`,
                     [chamado], async function (err: any, res: any) {
                         if (err) {
                             db.detach()
                             return reject(err);
                         }
-                        return resolve([res[0]['COD_TAREFA'], res[0]['HRREAL_TAREFA']])
+                        return resolve([res[0]['COD_TAREFA'], res[0]['HRREAL_TAREFA'], res[0]['PERIMP_TAREFA']])
                     })
             })
 
@@ -87,7 +87,7 @@ export default async function ValidHoursService(
 
             let limmesTarefaMin = parseInt(limmesTarefa) * 60
 
-            return resolve([limmesTarefaMin, minTotais])
+            return resolve([limmesTarefaMin, minTotais, perimpTarefa])
 
         } catch (err) {
             db.detach();
