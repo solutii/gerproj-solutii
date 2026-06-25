@@ -41,6 +41,7 @@ export default function Home() {
     const [modalEditOS, setModalEditOS] = useState(false);
     const [isUploading, setIsUploading] = useState(false)
     const [isChangeAccess, setIsChangeAccess] = useState(false)
+    const [isProcessing, setIsProcessing] = useState(false)
     const [loadingOs, setLoadingOs] = useState(false);
     const [listOs, setListOs] = useState([]);
     const [hours, setHours] = useState({
@@ -306,6 +307,9 @@ export default function Home() {
 
     async function changeStatus(chamado: ChamadosType, status: string) {
 
+      setIsProcessing(true);
+      try {
+
         if(chamado.CODTRF_CHAMADO === null) {
 
 
@@ -313,7 +317,7 @@ export default function Home() {
                 method: "POST",
                 body: JSON.stringify( { chamado } )
             }).then(response => response.json())
-            
+
             setSelectedTask(null);
             setTasks(selectedTasks);
             setModalTarefa(true);
@@ -380,9 +384,15 @@ export default function Home() {
 
         setOpenModal(false);
         getCalls();
+      } finally {
+        setIsProcessing(false);
+      }
     }
 
     async function startCall(chamado: ChamadosType) {
+
+      setIsProcessing(true);
+      try {
 
         if(chamado.CODTRF_CHAMADO === null) {
 
@@ -391,7 +401,7 @@ export default function Home() {
                 method: "POST",
                 body: JSON.stringify( { chamado } )
             }).then(response => response.json())
-            
+
             setSelectedTask(null);
             setTasks(selectedTasks);
             setModalTarefa(true);
@@ -409,110 +419,115 @@ export default function Home() {
 
         setOpenModal(false);
         getCalls();
+      } finally {
+        setIsProcessing(false);
+      }
     }
 
     async function apontamento(os: TaskType | null) {
 
         setLoadingOs(true);
 
+        try {
 
-        if(!validCurrentDate(date)) {
-            alert("Selecione uma data dentro do período vigente.");
-            return;
-        }
+            if(!validCurrentDate(date)) {
+                alert("Selecione uma data dentro do período vigente.");
+                return;
+            }
 
-        if((!hours.initial) || (!hours.final) || (!date)) {
-            alert("Selecione uma data e hora inicial/final");
-            return;
-        }
-
-
-        if( hours.initial > hours.final) {
-
-            alert("Hora inicial não pode ser maior que a hora final!")
-            return;
-
-        }
-
-        if(description?.trim() === "") {
-
-            console.log(description)
-
-            alert("Descrição do apontamento é obrigatória!")
-            return;
-        }
-
-    
-        if (!os) {
-            console.log(os)
-            alert("Selecione um projeto!");
-            return;
-        }
-        
-        //criar uma função identica a esta para validar as horas do projeto
-
-        let responseValidHours = await fetch("/api/os/valid-hours", {
-            method: "POST",
-            body: JSON.stringify({
-                chamado: os.COD_TAREFA,
-                date,
-                startTime: hours.initial,
-                endTime: hours.final,
-            })
-        })
-        .then((res) => res.json())
-        .then((res) => res); 
+            if((!hours.initial) || (!hours.final) || (!date)) {
+                alert("Selecione uma data e hora inicial/final");
+                return;
+            }
 
 
-        if(responseValidHours && responseValidHours[0] < responseValidHours[1] && responseValidHours[2] !== "SIM") {
+            if( hours.initial > hours.final) {
 
-            let horasTotais =  responseValidHours[0] / 60
-            //let horasApontadas = responseValidHours[1] / 60
-            console.log("TESTE")
-            const confirmacao = await Swal.fire({
-                title: `Horas mês: ${horasTotais}h`,
-                text: `Horas para está Tarefa já ultrapassaram o limite, impossível realizar o apontamento.`,
-                icon: 'warning',
-                showCancelButton: false,
-                confirmButtonColor: '#d33',
-                confirmButtonText: 'Confirmar',
-            })
-
+                alert("Hora inicial não pode ser maior que a hora final!")
                 return;
 
+            }
+
+            if(description?.trim() === "") {
+
+                console.log(description)
+
+                alert("Descrição do apontamento é obrigatória!")
+                return;
+            }
+
+
+            if (!os) {
+                console.log(os)
+                alert("Selecione um projeto!");
+                return;
+            }
+
+            //criar uma função identica a esta para validar as horas do projeto
+
+            let responseValidHours = await fetch("/api/os/valid-hours", {
+                method: "POST",
+                body: JSON.stringify({
+                    chamado: os.COD_TAREFA,
+                    date,
+                    startTime: hours.initial,
+                    endTime: hours.final,
+                })
+            })
+            .then((res) => res.json())
+            .then((res) => res);
+
+
+            if(responseValidHours && responseValidHours[0] < responseValidHours[1] && responseValidHours[2] !== "SIM") {
+
+                let horasTotais =  responseValidHours[0] / 60
+                //let horasApontadas = responseValidHours[1] / 60
+                const confirmacao = await Swal.fire({
+                    title: `Horas mês: ${horasTotais}h`,
+                    text: `Horas para está Tarefa já ultrapassaram o limite, impossível realizar o apontamento.`,
+                    icon: 'warning',
+                    showCancelButton: false,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Confirmar',
+                })
+
+                    return;
+
+            }
+
+
+            let task = await fetch("/api/get-task", {
+                method: "POST",
+                body: JSON.stringify({
+                    COD_CHAMADO: os?.COD_OS
+                })
+            })
+                .then((res) => res.json())
+                .then((res) => res);
+
+            let result = await fetch("/api/os/apoint", {
+                method: "POST",
+                body: JSON.stringify({
+                    os,
+                    description,
+                    date,
+                    startTime: hours.initial,
+                    endTime: hours.final,
+                    recurso: session?.user.recurso,
+                    state: 'STANDBY',
+                    task
+                })
+            })
+                .then((res) => res.json())
+                .then((res) => res);
+
+            if (!result) return;
+
+            getAllOsTarefa();
+            setModalApontamento(false);
+        } finally {
+            setLoadingOs(false);
         }
-
-
-        let task = await fetch("/api/get-task", {
-            method: "POST",
-            body: JSON.stringify({
-                COD_CHAMADO: os?.COD_OS
-            })
-        })
-            .then((res) => res.json())
-            .then((res) => res);
-
-        let result = await fetch("/api/os/apoint", {
-            method: "POST",
-            body: JSON.stringify({
-                os,
-                description,
-                date,
-                startTime: hours.initial,
-                endTime: hours.final,
-                recurso: session?.user.recurso,
-                state: 'STANDBY',
-                task
-            })
-        })
-            .then((res) => res.json())
-            .then((res) => res);
-
-        if (!result) return;
-
-        getAllOsTarefa();        
-        setModalApontamento(false);
-        setLoadingOs(false);
     }
 
 
@@ -586,35 +601,41 @@ export default function Home() {
         }
 
 
-        let task = await fetch("/api/get-task", {
-            method: "POST",
-            body: JSON.stringify({
-                COD_CHAMADO: selectedCall?.COD_CHAMADO
+        setIsProcessing(true);
+        try {
+
+            let task = await fetch("/api/get-task", {
+                method: "POST",
+                body: JSON.stringify({
+                    COD_CHAMADO: selectedCall?.COD_CHAMADO
+                })
             })
-        })
-            .then((res) => res.json())
-            .then((res) => res);
+                .then((res) => res.json())
+                .then((res) => res);
 
-        let result = await fetch("/api/call/standby", {
-            method: "POST",
-            body: JSON.stringify({
-                chamado,
-                description,
-                date,
-                startTime: hours.initial,
-                endTime: hours.final,
-                state: 'STANDBY',
-                task
+            let result = await fetch("/api/call/standby", {
+                method: "POST",
+                body: JSON.stringify({
+                    chamado,
+                    description,
+                    date,
+                    startTime: hours.initial,
+                    endTime: hours.final,
+                    state: 'STANDBY',
+                    task
+                })
             })
-        })
-            .then((res) => res.json())
-            .then((res) => res);
+                .then((res) => res.json())
+                .then((res) => res);
 
-        if (!result) return;
+            if (!result) return;
 
-        getCalls();
-        getAllOs();        
-        setModalStandby(false);
+            getCalls();
+            getAllOs();
+            setModalStandby(false);
+        } finally {
+            setIsProcessing(false);
+        }
     }
 
     async function salvarAcessoCliente(){
@@ -654,73 +675,78 @@ export default function Home() {
     async function updateChamadoTarefa() {
         setLoadingOs(true);
 
+        try {
 
-        if(!selectedTask) {
-            alert("Selecione uma tarefa!")
-            return;
-        }
-
-
-        let result = await fetch("/api/insert-task", {
-            method: "POST",
-            body: JSON.stringify({
-                COD_CHAMADO: selectedCall?.COD_CHAMADO,
-                COD_TAREFA: selectedTask 
-            })
-        })
-            .then((res) => res.json())
-            .then((res) => res);
-
-        if (!result) return;
-
-        if(selectedCall) {
-            let call = {
-                ...selectedCall,
-                CODTRF_CHAMADO: selectedTask
+            if(!selectedTask) {
+                alert("Selecione uma tarefa!")
+                return;
             }
-            await startCall(call)
+
+
+            let result = await fetch("/api/insert-task", {
+                method: "POST",
+                body: JSON.stringify({
+                    COD_CHAMADO: selectedCall?.COD_CHAMADO,
+                    COD_TAREFA: selectedTask
+                })
+            })
+                .then((res) => res.json())
+                .then((res) => res);
+
+            if (!result) return;
+
+            if(selectedCall) {
+                let call = {
+                    ...selectedCall,
+                    CODTRF_CHAMADO: selectedTask
+                }
+                await startCall(call)
+            }
+
+
+            setModalTarefa(false);
+        } finally {
+            setLoadingOs(false);
         }
-
-
-        setModalTarefa(false);
-
-        setLoadingOs(false);
 
     }
 
     async function updateClassificacao() {
         setLoadingOs(true);
 
-        if(!selectedClassificacao) {
-            alert("Selecione uma classificação!")
-            return;
-        }
+        try {
 
-
-        let result = await fetch("/api/insert-classificacao", {
-            method: "POST",
-            body: JSON.stringify({
-                COD_CHAMADO: selectedCall?.COD_CHAMADO,
-                COD_CLASSIFICACAO: selectedClassificacao
-            })
-        })
-            .then((res) => res.json())
-            .then((res) => res);
-
-        if (!result) return;
-
-        if(selectedCall) {
-            let call = {
-                ...selectedCall,
-                CODTRF_CHAMADO: selectedTask
+            if(!selectedClassificacao) {
+                alert("Selecione uma classificação!")
+                return;
             }
-            await startCall(call)
+
+
+            let result = await fetch("/api/insert-classificacao", {
+                method: "POST",
+                body: JSON.stringify({
+                    COD_CHAMADO: selectedCall?.COD_CHAMADO,
+                    COD_CLASSIFICACAO: selectedClassificacao
+                })
+            })
+                .then((res) => res.json())
+                .then((res) => res);
+
+            if (!result) return;
+
+            if(selectedCall) {
+                let call = {
+                    ...selectedCall,
+                    CODTRF_CHAMADO: selectedTask
+                }
+                await startCall(call)
+            }
+
+
+            setModalClassificacao(false);
+        } finally {
+            setLoadingOs(false);
         }
-
-
-        setModalClassificacao(false);
-
-        setLoadingOs(false);
 
     }
 
@@ -953,6 +979,15 @@ export default function Home() {
                     <div className="bg-white rounded-lg p-6 flex flex-col items-center gap-4">
                         <Loading />
                         <p className="text-gray-700">Atualizando acesso...</p>
+                    </div>
+                </div>
+            }
+
+            { isProcessing &&
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                    <div className="bg-white rounded-lg p-6 flex flex-col items-center gap-4">
+                        <Loading />
+                        <p className="text-gray-700">Processando...</p>
                     </div>
                 </div>
             }

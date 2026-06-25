@@ -27,6 +27,12 @@ export default async function UpdateCallService(
                 })
             })
 
+            // IMPORTANTE: execute TODAS as leituras (db.query / auto-commit) ANTES de
+            // abrir a transação que faz o UPDATE no CHAMADO. Caso contrário, a leitura
+            // abaixo (que faz JOIN no CHAMADO) tenta ler a linha que o UPDATE travou,
+            // e como o ISOLATION_READ_COMMITTED do node-firebird usa no_rec_version+wait,
+            // ela espera o commit que nunca acontece -> deadlock (335544336).
+
             let newID: number = await new Promise((resolve, reject) => {
 
                 db.query(`SELECT MAX(COD_HISTCHAMADO) + 1 as ID FROM HISTCHAMADO`,
@@ -38,7 +44,54 @@ export default async function UpdateCallService(
                         return resolve(res[0]['ID'])
                     })
             })
-   
+
+            let NUM_OS_MATER: any = await new Promise<[number, number|string]>((resolve, reject) => {
+
+                db.query(`SELECT Max(OS.num_os) as num_os FROM
+                            OS
+                                INNER JOIN
+                            CHAMADO on CHAMADO.cod_chamado = CAST(OS.chamado_os as integer )
+                                INNER JOIN
+                            TAREFA  on TAREFA.cod_tarefa = OS.codtrf_os
+
+                            WHERE
+                            CHAMADO.cod_chamado = ?
+                            and TAREFA.cod_tarefa = ?
+                            and OS.codrec_os = ?`,
+                    [   chamado.COD_CHAMADO
+                        ,chamado.CODTRF_CHAMADO??task[0].COD_TAREFA
+                        ,chamado.COD_RECURSO
+
+                    ], async function (err: any, res: any) {
+                        if (err) {
+                            db.detach()
+                            return reject(err);
+                        }
+                        return resolve(res)
+                    })
+            })
+
+            let [COD_OS, NUM_OS] = await new Promise<[number, number|string]>((resolve, reject) => {
+
+                db.query(`SELECT MAX(COD_OS) + 1 as COD_OS, MAX(NUM_OS) as NUM_OS FROM OS`,
+                    [], async function (err: any, res: any) {
+                        if (err) {
+                            db.detach()
+                            return reject(err);
+                        }
+                        return resolve([res[0]['COD_OS'], res[0]['NUM_OS']])
+                    })
+            })
+
+            NUM_OS = `000${String( parseInt(NUM_OS as string)+1)}`.slice(-6)
+
+            console.log('num os manter', NUM_OS_MATER)
+
+            if(!!NUM_OS_MATER[0]['NUM_OS']) {
+                NUM_OS = NUM_OS_MATER[0]['NUM_OS']
+            }
+
+            // A partir daqui só rodam statements DENTRO da transação (sem db.query).
             const transaction: any = await new Promise((resolve, reject) => {
                 db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
                     if (err) {
@@ -84,80 +137,10 @@ export default async function UpdateCallService(
 
                         return resolve(true)
 
-                        
+
                     });
             })
 
-            let NUM_OS_MATER: any = await new Promise<[number, number|string]>((resolve, reject) => {
-
-                db.query(`SELECT Max(OS.num_os) as num_os FROM
-                            OS
-                                INNER JOIN
-                            CHAMADO on CHAMADO.cod_chamado = CAST(OS.chamado_os as integer )
-                                INNER JOIN
-                            TAREFA  on TAREFA.cod_tarefa = OS.codtrf_os
-
-                            WHERE
-                            CHAMADO.cod_chamado = ?
-                            and TAREFA.cod_tarefa = ?
-                            and OS.codrec_os = ?`,
-                    [   chamado.COD_CHAMADO
-                        ,chamado.CODTRF_CHAMADO??task[0].COD_TAREFA
-                        ,chamado.COD_RECURSO
-
-                    ], async function (err: any, res: any) {
-                        if (err) {
-                            db.detach()
-                            return reject(err);
-                        }
-                        return resolve(res)
-                    })
-            })
-
-            let [COD_OS, NUM_OS] = await new Promise<[number, number|string]>((resolve, reject) => {
-
-                db.query(`SELECT MAX(COD_OS) + 1 as COD_OS, MAX(NUM_OS) as NUM_OS FROM OS`,
-                    [], async function (err: any, res: any) {
-                        if (err) {
-                            db.detach()
-                            return reject(err);
-                        }
-                        return resolve([res[0]['COD_OS'], res[0]['NUM_OS']])
-                    })
-            })
-            
-            NUM_OS = `000${String( parseInt(NUM_OS as string)+1)}`.slice(-6)
-
-            console.log('num os manter', NUM_OS_MATER)
-
-            if(!!NUM_OS_MATER[0]['NUM_OS']) {
-                NUM_OS = NUM_OS_MATER[0]['NUM_OS']
-            }
-
-            console.log(COD_OS,
-                        chamado.CODTRF_CHAMADO??task[0].COD_TAREFA,
-                        new Date(`${date} 00:00`).toLocaleString('pt-br', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replaceAll('/', '.').replaceAll(',', ''),
-                        startTime.replace(":", ""),
-                        endTime.replace(":", ""),
-                        chamado.ASSUNTO_CHAMADO,
-                        STATUS_CHAMADO_COD['STANDBY'],
-                        'SIM',  //PRODUTIVO_OS
-                        chamado.COD_RECURSO,
-                        'SIM',  //PRODUTIVO2_OS
-                        task[0].RESPCLI_PROJETO, //RESPCLI_OS
-                        iconv.encode( description, 'WIN1252'),
-                        'NAO',
-                        'NAO',
-                        new Date().toLocaleString('pt-br', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replaceAll('/', '.').replaceAll(',', ''),
-                        'SIM',  //FATURADO_OS
-                        100, //PERC_OS
-                        'SIM', //VALID_OS
-                        NUM_OS,
-                        chamado.COD_CHAMADO,
-                        0,
-                        new Date().toLocaleString('pt-br', { year: 'numeric', month: '2-digit'}))
-            
-            
             success = await new Promise((resolve, reject) => {
                 transaction.query(
                 `insert into OS (
@@ -222,11 +205,8 @@ export default async function UpdateCallService(
                     });
             })
 
-            /**
-             * COD_OS, CODTRF_OS, DTINI_OS, HRINI_OS, HRFIM_OS, STATUS (1 - LEVANTAMENTO, 2 - DESENVOLVIMENTO, 3 - TESTE, 4 - CONCLUIDO), ?, PRODUTIVO_OS ('SIM'), CODREC_OS, PRODUTIVO2_OS ('SIM'), RESPCLI_OS, REMDES_OS ('NAO'), ABONO_OS ('NAO'), DESLOC_OS (0000), OBS (BLOB), DTINC_OS (DATA DE INCLUSAO), FATURADO_OS, PERC_OS (100), COMP_OS (MES VIGENTE), VALID_OS, VRHR_OS, NUM_OS, CHAMADO_OS
-             */
-
             success = await transaction.commit((err: Error) => {
+                
                 if (err) {
                     transaction.rollback();
                     return reject(err)
