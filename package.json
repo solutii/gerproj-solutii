@@ -15,6 +15,7 @@
     "@mui/material": "^5.15.19",
     "@mui/x-data-grid": "^7.6.2",
     "adm-zip": "^0.5.16",
+    "axios": "^1.18.1",
     "iconv-lite": "^0.6.3",
     "mime": "^4.1.0",
     "next": "14.2.3",
