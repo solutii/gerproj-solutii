@@ -1,26 +1,23 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import https from 'node:https';
-import tls from 'node:tls';
+'use strict';
 
-// mTLS exige o módulo https do Node, então força runtime node (não edge)
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+const https = require('node:https');
+const tls = require('node:tls');
 
 const BASE_URL = 'https://adn.nfse.gov.br/contribuintes/DFe';
 
 // Aceita o certificado como PEM (contém "-----BEGIN") ou base64 de um PEM.
-function normalizePem(value: string): string {
+function normalizePem(value) {
   return value.includes('-----BEGIN')
     ? value
     : Buffer.from(value, 'base64').toString('utf8');
 }
 
-function buildAgent(cert: string, key: string, ca?: string, passphrase?: string): https.Agent {
+function buildAgent(cert, key, ca, passphrase) {
   // IMPORTANTE: a opção `ca` SUBSTITUI a store de CAs padrão do Node. O `ca` recebido
   // é a cadeia do certificado CLIENTE (ICP-Brasil); se passado sozinho, o Node perde a
   // CA pública que assina o servidor adn.nfse.gov.br e dá "unable to get local issuer
   // certificate". Por isso mesclamos com tls.rootCertificates.
-  const caList: string[] = [...tls.rootCertificates];
+  const caList = [...tls.rootCertificates];
   if (ca) {
     caList.push(normalizePem(ca));
   }
@@ -34,13 +31,10 @@ function buildAgent(cert: string, key: string, ca?: string, passphrase?: string)
   });
 }
 
-function fetchDFe(
-  url: string,
-  agent: https.Agent
-): Promise<{ status: number; body: string; contentType: string }> {
+function fetchDFe(url, agent) {
   return new Promise((resolve, reject) => {
     const req = https.request(url, { method: 'GET', agent }, (res) => {
-      const chunks: Buffer[] = [];
+      const chunks = [];
       res.on('data', (chunk) => chunks.push(chunk));
       res.on('end', () => {
         resolve({
@@ -56,66 +50,56 @@ function fetchDFe(
   });
 }
 
-async function handlerPost(request: NextRequest) {
-  let body: any;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: 'Corpo da requisição inválido (JSON esperado)' },
-      { status: 400 }
-    );
-  }
+// Resposta no formato web action do DigitalOcean Functions
+function json(statusCode, payload) {
+  return {
+    statusCode,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  };
+}
 
-  let { cnpj, lote, nsu, cert, key, ca, passphrase } = body ?? {};
+// DigitalOcean Functions usa `main(args)`. Com `web: true`, os campos do corpo JSON
+// chegam mesclados em `args` (args.cnpj, args.cert, etc.).
+async function main(args) {
+  let { cnpj, lote, nsu, cert, key, ca, passphrase } = args ?? {};
 
   // Mantém apenas dígitos — também evita injeção na URL
   cnpj = String(cnpj ?? '').replace(/\D/g, '');
   nsu = String(nsu ?? '').replace(/\D/g, '');
 
   if (!cnpj) {
-    return NextResponse.json(
-      { success: false, error: 'Campo "cnpj" é obrigatório' },
-      { status: 400 }
-    );
+    return json(400, { success: false, error: 'Campo "cnpj" é obrigatório' });
   }
 
   if (!lote) {
-    return NextResponse.json(
-      { success: false, error: 'Campo "lote" é obrigatório' },
-      { status: 400 }
-    );
+    return json(400, { success: false, error: 'Campo "lote" é obrigatório' });
   }
 
   if (!nsu) {
-    return NextResponse.json(
-      { success: false, error: 'Campo "nsu" (último NSU) é obrigatório' },
-      { status: 400 }
-    );
+    return json(400, { success: false, error: 'Campo "nsu" (último NSU) é obrigatório' });
   }
 
   if (!cert || !key) {
-    return NextResponse.json(
-      { success: false, error: 'Campos "cert" e "key" são obrigatórios' },
-      { status: 400 }
-    );
+    return json(400, { success: false, error: 'Campos "cert" e "key" são obrigatórios' });
   }
 
   try {
     const agent = buildAgent(cert, key, ca, passphrase);
     const url = `${BASE_URL}/${nsu}?cnpjConsulta=${encodeURIComponent(cnpj)}&lote=${encodeURIComponent(lote)}`;
 
-    const { status, body: respBody, contentType } = await fetchDFe(url, agent);
+    const { status, body, contentType } = await fetchDFe(url, agent);
 
     // Repassa o corpo e o status originais do gateway nacional
-    return new NextResponse(respBody, {
-      status,
+    return {
+      statusCode: status,
       headers: { 'content-type': contentType },
-    });
+      body,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro interno';
-    return NextResponse.json({ success: false, error: message }, { status: 502 });
+    return json(502, { success: false, error: message });
   }
 }
 
-export { handlerPost as POST };
+exports.main = main;
