@@ -3,8 +3,6 @@
 const https = require('node:https');
 const tls = require('node:tls');
 
-const BASE_URL = 'https://adn.nfse.gov.br/contribuintes/DFe';
-
 // Aceita o certificado como PEM (contém "-----BEGIN") ou base64 de um PEM.
 function normalizePem(value) {
   return value.includes('-----BEGIN')
@@ -62,22 +60,10 @@ function json(statusCode, payload) {
 // DigitalOcean Functions usa `main(args)`. Com `web: true`, os campos do corpo JSON
 // chegam mesclados em `args` (args.cnpj, args.cert, etc.).
 async function main(args) {
-  let { cnpj, lote, nsu, cert, key, ca, passphrase } = args ?? {};
+  const { url, cert, key, ca, passphrase } = args ?? {};
 
-  // Mantém apenas dígitos — também evita injeção na URL
-  cnpj = String(cnpj ?? '').replace(/\D/g, '');
-  nsu = String(nsu ?? '').replace(/\D/g, '');
-
-  if (!cnpj) {
-    return json(400, { success: false, error: 'Campo "cnpj" é obrigatório' });
-  }
-
-  if (!lote) {
-    return json(400, { success: false, error: 'Campo "lote" é obrigatório' });
-  }
-
-  if (!nsu) {
-    return json(400, { success: false, error: 'Campo "nsu" (último NSU) é obrigatório' });
+  if (!url) {
+    return json(400, { success: false, error: 'Campo "url" é obrigatório' });
   }
 
   if (!cert || !key) {
@@ -86,7 +72,6 @@ async function main(args) {
 
   try {
     const agent = buildAgent(cert, key, ca, passphrase);
-    const url = `${BASE_URL}/${nsu}?cnpjConsulta=${encodeURIComponent(cnpj)}&lote=${encodeURIComponent(lote)}`;
 
     const { status, body, contentType } = await fetchDFe(url, agent);
 
