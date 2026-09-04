@@ -1,6 +1,38 @@
 import nodemailer from 'nodemailer';
 import { Firebird, options } from "../firebird";
 
+// Gera o link de validação sem login (token assinado, ver
+// /api/gerar-link-validacao no dashboard). Se a chamada falhar por
+// qualquer motivo, cai no link antigo (portal sem chamado pré-selecionado)
+// em vez de travar o envio do e-mail.
+async function gerarLinkValidacao(codChamado: string): Promise<string> {
+    const urlBase = 'https://portal.solutii.com.br';
+    const fallback = `${urlBase}/`;
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(`${urlBase}/api/gerar-link-validacao`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Internal-Key': process.env.LINK_VALIDACAO_INTERNAL_KEY ?? '',
+            },
+            body: JSON.stringify({ codChamado: Number(codChamado) }),
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!res.ok) return fallback;
+
+        const data = await res.json();
+        return typeof data?.url === 'string' && data.url.trim() ? data.url : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 export async function sendEmail(
     to: string,
     subject: string,
@@ -108,6 +140,8 @@ export async function sendEmail(
     chamado.numero          = registroChamado[0].COD_CHAMADO
     to = registroChamado[0].EMAIL_CHAMADO
 
+    const linkValidacao = await gerarLinkValidacao(String(chamado.numero));
+
     // Configuração do transporte de e-mail
     const transporter = nodemailer.createTransport(parametrosFormatados);
 
@@ -205,7 +239,7 @@ export async function sendEmail(
                         </tr>
                         <tr>
                             <td class="content" style="padding:12px 32px 22px 32px;">
-                                <a href="https://portal.solutii.com.br/" target="_blank"
+                                <a href="${linkValidacao}" target="_blank"
                                     style="display:inline-block;padding:10px 16px;background:#0f3d63;color:#ffffff;text-decoration:none;border-radius:10px;font-family:Segoe UI,Arial,Helvetica,sans-serif;font-size:14px;margin-right:8px;">
                                     Confirmar validação
                                 </a>
