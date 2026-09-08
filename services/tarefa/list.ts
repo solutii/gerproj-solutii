@@ -1,7 +1,7 @@
 import { ChamadosType } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 import { TaskType } from "@/models/tarefa";
-import iconv from "iconv-lite";
+import { decodeBlobText } from "../encoding";
 
 export default async function ListTaskService(recurso: string): Promise<TaskType[]> {
 
@@ -18,7 +18,7 @@ export default async function ListTaskService(recurso: string): Promise<TaskType
                 stream.on("data", (chunk: Buffer) => chunks.push(chunk));
                 stream.on("end", () => {
                     const buffer = Buffer.concat(chunks);
-                    resolve(iconv.decode(buffer, "ISO-8859-1").toString());
+                    resolve(decodeBlobText(buffer));
                 });
                 stream.on("error", reject);
             });
@@ -26,7 +26,7 @@ export default async function ListTaskService(recurso: string): Promise<TaskType
     };
 
     return new Promise((resolve, reject) => {
-        Firebird.attach(options, async (err: any, db: any) => {
+        getConnection( async (err: any, db: any) => {
             if (err) return reject(err);
 
             db.query(
@@ -57,7 +57,7 @@ export default async function ListTaskService(recurso: string): Promise<TaskType
                 [recurso, 3, 2, 1],
                 async (err: any, result: any) => {
                     if (err) {
-                        db.detach();
+                        db?.detach();
                         return reject(err);
                     }
 
@@ -85,10 +85,10 @@ export default async function ListTaskService(recurso: string): Promise<TaskType
                             })
                         );
 
-                        db.detach();
+                        db?.detach();
                         resolve(result);
                     } catch (e) {
-                        db.detach();
+                        db?.detach();
                         reject(e);
                     }
                 }

@@ -1,6 +1,6 @@
 'use server'
 
-import { Firebird, options } from "./firebird";
+import { Firebird, getConnection } from "./firebird";
 
 function xorString(inputString: string) {
     let result = '';
@@ -17,12 +17,12 @@ export default async function UserService({ login, password } :{ login: string, 
     
         return new Promise((resolve, reject ) => {
 
-            Firebird.attach(options, function(err: any, db: any) {
+            getConnection( function(err: any, db: any) {
 
                 if (err) {
-                    return reject(err.message())
+                    return reject(err.message)
                 }
-            
+
                 // db = DATABASE
                 db.query(
                 `SELECT 
@@ -40,11 +40,11 @@ export default async function UserService({ login, password } :{ login: string, 
                 [login.toUpperCase()], async function(err: any, result: any) {
 
                     
-                    db.detach();
+                    db?.detach();
     
                     if (err) {
-                        return reject(err.message())
-                    } 
+                        return reject(err.message)
+                    }
     
                     
                     if(! result.length ) {

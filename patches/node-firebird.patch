@@ -1,0 +1,44 @@
+diff --git a/lib/wire/serialize.js b/lib/wire/serialize.js
+index 34534c261e729d88d6985fd5e5f225afda994686..3ce0ac4d567b854cdcc8106ce2e6fc0f5aa3deb9 100644
+--- a/lib/wire/serialize.js
++++ b/lib/wire/serialize.js
+@@ -299,6 +299,11 @@ XdrWriter.prototype.addString = function(s, encoding) {
+ };
+ 
+ XdrWriter.prototype.addText = function(s, encoding) {
++    // PATCH (gerproj-solutii, ver services/firebird.ts): forca latin1 em vez
++    // do encoding recebido (sempre 'UTF8', hardcoded em lib/wire/const.js
++    // DEFAULT_ENCODING) -- o banco (legado Delphi/Windows) grava em WIN1252,
++    // identico a latin1 na faixa 0xA0-0xFF onde ficam os acentos.
++    encoding = 'latin1';
+     var len = Buffer.byteLength(s, encoding);
+     var alen = align(len);
+     this.ensure(alen);
+@@ -448,6 +453,9 @@ XdrReader.prototype.readString = function(encoding) {
+ };
+ 
+ XdrReader.prototype.readText = function(len, encoding) {
++    // PATCH (gerproj-solutii, ver services/firebird.ts): mesma correcao do
++    // addText acima, na leitura.
++    encoding = 'latin1';
+     if (len <= 0)
+         return '';
+ 
+diff --git a/lib/wire/xsqlvar.js b/lib/wire/xsqlvar.js
+index 811e2993996776d9fb78307cc320ff54d1b7dcb5..2ef164ce2675614394585a0e5f9902acba17e313 100644
+--- a/lib/wire/xsqlvar.js
++++ b/lib/wire/xsqlvar.js
+@@ -411,8 +411,12 @@ SQLParamString.prototype.encode = function(data) {
+ };
+ 
+ SQLParamString.prototype.calcBlr = function(blr) {
++    // PATCH (gerproj-solutii, ver services/firebird.ts): addText (serialize.js)
++    // agora sempre grava em latin1 -- o tamanho declarado aqui precisa bater
++    // com os bytes realmente escritos, senao o protocolo quebra em qualquer
++    // parametro de string acentuada.
+     blr.addByte(Const.blr_text);
+-    var len = this.value ? Buffer.byteLength(this.value, Const.DEFAULT_ENCODING) : 0;
++    var len = this.value ? Buffer.byteLength(this.value, 'latin1') : 0;
+     blr.addWord(len);
+ };
+ 

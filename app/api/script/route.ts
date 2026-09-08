@@ -1,4 +1,4 @@
-import { Firebird, options } from "../../../services/firebird";
+import { Firebird, getConnection } from "../../../services/firebird";
 import { NextResponse, type NextRequest } from 'next/server'
  
 async function handler(request: NextRequest) {  
@@ -8,7 +8,7 @@ async function handler(request: NextRequest) {
     let db: any = null
 
     db = await new Promise((resolve, reject) => {
-        Firebird.attach(options, (err: any, db: any) => {
+        getConnection( (err: any, db: any) => {
             if (err) {
                 return reject(err)
             }
@@ -23,7 +23,7 @@ async function handler(request: NextRequest) {
                     `,
                     [], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(res)
@@ -37,7 +37,7 @@ async function handler(request: NextRequest) {
                 db.query(`SELECT MAX(COD_OS) + 1 as COD_OS, MAX(NUM_OS) as NUM_OS FROM OS`,
                     [], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve([res[0]['COD_OS'], res[0]['NUM_OS']])

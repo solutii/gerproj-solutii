@@ -1,5 +1,5 @@
 import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 import iconv from "iconv-lite"
 
 export default async function UpdateAcesso(
@@ -13,7 +13,7 @@ export default async function UpdateAcesso(
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -24,7 +24,7 @@ export default async function UpdateAcesso(
             const transaction: any = await new Promise((resolve, reject) => {
                 db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
                     if (err) {
-                        db.detach()
+                        db?.detach()
                         return reject(err)
                     }
                     return resolve(transaction)
@@ -47,7 +47,7 @@ export default async function UpdateAcesso(
                         if (err) {
                             console.log(10,err)
                             transaction.rollback();
-                            db.detach()
+                            db?.detach()
                             return reject(err)
                         }
 
@@ -68,7 +68,7 @@ export default async function UpdateAcesso(
                 }
                 else {
                     console.log(9)
-                    db.detach();
+                    db?.detach();
                     return resolve(true)
                 }
 
@@ -77,7 +77,7 @@ export default async function UpdateAcesso(
 
         } catch (err) {
             console.log(10, err)
-            db.detach();
+            db?.detach();
             return reject(err)
         }
     })

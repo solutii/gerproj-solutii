@@ -1,5 +1,6 @@
 import { ChamadoLimitType, ChamadosType, STATUS_CHAMADO } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
+import { decodeBlobText } from "../encoding";
 
 export default (function OsService() {
 
@@ -12,12 +13,12 @@ export default (function OsService() {
                 if (err) return reject(err);
                 if (!stream) return resolve("");
 
-                let data = "";
+                const chunks: Buffer[] = [];
                 stream.on("data", (chunk: Buffer) => {
-                    data += chunk.toString("latin1"); // Corrige acentos
+                    chunks.push(chunk);
                 });
                 stream.on("end", () => {
-                    resolve(data); // Converte para UTF-8
+                    resolve(decodeBlobText(Buffer.concat(chunks)));
                 });
                 stream.on("error", reject);
             });
@@ -37,7 +38,7 @@ export default (function OsService() {
 
     function list(chamado: string, recurso: string, data: string): Promise<ChamadosType[]> {
         return new Promise((resolve, reject) => {
-            Firebird.attach(options, async (err: any, db: any) => {
+            getConnection( async (err: any, db: any) => {
                 if (err) return reject(err);
 
                 db.query(
@@ -60,12 +61,12 @@ export default (function OsService() {
                     [data ? data : chamado, recurso],
                     async (err: any, result: any) => {
                         if (err) {
-                            db.detach();
+                            db?.detach();
                             return reject(err);
                         }
 
                         if (!result.length) {
-                            db.detach();
+                            db?.detach();
                             return resolve([]);
                         }
 
@@ -79,10 +80,10 @@ export default (function OsService() {
                                 }
                             }
 
-                            db.detach();
+                            db?.detach();
                             resolve(result);
                         } catch (e) {
-                            db.detach();
+                            db?.detach();
                             reject(e);
                         }
                     }
@@ -93,7 +94,7 @@ export default (function OsService() {
 
     function listOsTarefa(tarefa: string, recurso: string, data: string): Promise<ChamadosType[]> {
         return new Promise((resolve, reject) => {
-            Firebird.attach(options, async (err: any, db: any) => {
+            getConnection( async (err: any, db: any) => {
                 if (err) return reject(err);
 
                 db.query(
@@ -116,22 +117,22 @@ export default (function OsService() {
                     [data ? data : tarefa, recurso],
                     async (err: any, result: any) => {
                         if (err) {
-                            db.detach();
+                            db?.detach();
                             return reject(err);
                         }
 
                         if (!result.length) {
-                            db.detach();
+                            db?.detach();
                             return resolve([]);
                         }
 
                         try {
                             await processBlobs(result, "OBS");
 
-                            db.detach();
+                            db?.detach();
                             resolve(result);
                         } catch (e) {
-                            db.detach();
+                            db?.detach();
                             reject(e);
                         }
                     }
@@ -142,7 +143,7 @@ export default (function OsService() {
 
     function details(chamado: string, recurso: string): Promise<ChamadoLimitType[]> {
         return new Promise((resolve, reject) => {
-            Firebird.attach(options, (err: any, db: any) => {
+            getConnection( (err: any, db: any) => {
                 if (err) return reject(err);
 
                 db.query(
@@ -155,7 +156,7 @@ export default (function OsService() {
                     `,
                     [chamado, recurso],
                     (err: any, result: any) => {
-                        db.detach();
+                        db?.detach();
                         if (err) return reject(err);
                         resolve(result);
                     }
@@ -168,7 +169,7 @@ export default (function OsService() {
         let db: any = null;
         try {
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) return reject(err);
                     resolve(db);
                 });
@@ -241,10 +242,10 @@ export default (function OsService() {
                 });
             });
 
-            db.detach();
+            db?.detach();
             return true;
         } catch (err) {
-            if (db) db.detach();
+            if (db) db?.detach();
             throw err;
         }
     }

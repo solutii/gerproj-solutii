@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import mime from 'mime';
+import { getAnexosBasePath } from '@/services/anexos';
 
 export const runtime = 'nodejs'; // allow fs usage in Next.js route
-
-const BASE_DIR = 'C:\\GERPROJ\\Dropbox\\DOC\\CALLTECH';
 
 function sanitizeName(name: string) {
   return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
@@ -24,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const safeCod = sanitizeName(codChamado);
-    const folderPath = path.resolve(path.join(BASE_DIR, safeCod));
+    const folderPath = path.resolve(path.join(getAnexosBasePath(), 'CALLTECH', safeCod));
 
     await fs.promises.mkdir(folderPath, { recursive: true });
 

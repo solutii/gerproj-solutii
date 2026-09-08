@@ -1,4 +1,4 @@
-import { Firebird, options } from "../../../services/firebird";
+import { Firebird, getConnection } from "../../../services/firebird";
 import { NextResponse, type NextRequest } from 'next/server'
 import iconv from 'iconv-lite';
 
@@ -30,18 +30,18 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await new Promise((resolve, reject) => {
-      Firebird.attach(options, (attachErr: any, db: any) => {
+      getConnection( (attachErr: any, db: any) => {
         if (attachErr) return reject(attachErr);
 
         const deleteSql = `DELETE FROM RECAREA WHERE COD_RECURSO = ?`;
         db.query(deleteSql, [codRecurso], (delErr: any) => {
           if (delErr) {
-            db.detach();
+            db?.detach();
             return reject(delErr);
           }
 
           if (normalizedItems.length === 0) {
-            db.detach();
+            db?.detach();
             return resolve({ inserted: 0 });
           }
 
@@ -51,12 +51,12 @@ export async function POST(request: NextRequest) {
             const row = normalizedItems[i];
             db.query(insertSql, [row.COD_RECURSO, row.COD_AREA, row.OBS_RECAREA], (insErr: any) => {
               if (insErr) {
-                db.detach();
+                db?.detach();
                 return reject(insErr);
               }
               i++;
               if (i >= normalizedItems.length) {
-                db.detach();
+                db?.detach();
                 return resolve({ inserted: normalizedItems.length });
               }
               runNext();

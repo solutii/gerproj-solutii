@@ -1,5 +1,5 @@
 import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 
 export default async function ValidLimitDate(
     recurso: string
@@ -12,7 +12,7 @@ export default async function ValidLimitDate(
 
         try {
 
-            Firebird.attach(options, function (err: any, db: any) {
+            getConnection( function (err: any, db: any) {
 
                 if (err) {
                     return reject(err)
@@ -33,12 +33,12 @@ export default async function ValidLimitDate(
                        
                         if (err) {
                             console.log(err)
-                            db.detach();
+                            db?.detach();
                             return reject(err)
                         }
 
                         // Fechar a conexão com o banco de dados
-                        db.detach();
+                        db?.detach();
                         return resolve(result)
                         // IMPORTANT: close the connection
 
@@ -48,7 +48,7 @@ export default async function ValidLimitDate(
 
         } catch (err) {
             console.log(err)
-            db.detach();
+            db?.detach();
             return reject(err)
         }
     })

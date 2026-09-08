@@ -21,6 +21,21 @@ import { STATUS_TASK, TaskType } from "@/models/tarefa";
 import iconv from 'iconv-lite'
 import UserComponent from "@/components/user";
 
+// SOLICITACAO_CHAMADO vem de um editor de texto rico (HTML) -- aqui queremos
+// só o texto puro que o usuário digitou na abertura do chamado, sem as tags.
+function stripHtml(html: string): string {
+    return html
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 export default function Home() {
     const { data: session } = useSession();
     const [calls, setCalls] = useState<ChamadosType[]>([]);
@@ -658,10 +673,9 @@ export default function Home() {
     }
 
     function openDescriptions(chamado: ChamadosType) {
-        let desc = chamado?.SOLICITACAO_CHAMADO?.trim();
-        desc = desc?.substring(1, desc.length - 1);
+        const desc = stripHtml(chamado?.SOLICITACAO_CHAMADO?.trim() ?? "");
         setSelectedCall(chamado)
-        setDescriptionText(desc??"");
+        setDescriptionText(desc);
         setOpenModal(true);
     }
 
@@ -999,10 +1013,9 @@ export default function Home() {
                     setOpenModal={setOpenModal}
                     title="Descrição"
                 >
-                    <p
-                        className="my-4 text-blueGray-500 text-lg leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: descriptionText }}
-                    ></p>
+                    <p className="my-4 text-blueGray-500 text-lg leading-relaxed">
+                        {descriptionText}
+                    </p>
                 </Modal>
             }
 
@@ -1281,7 +1294,7 @@ export default function Home() {
                                 <td className="text-center p-2">
                                     {c?.COD_CHAMADO?.toLocaleString("pt-br")}
                                 </td>
-                                <td className="text-start  p-2">{Buffer.from(c?.ASSUNTO_CHAMADO, "latin1").toString("utf8")}</td>
+                                <td className="text-start  p-2">{c?.ASSUNTO_CHAMADO}</td>
                                 <td className="text-start  p-2">{c?.EMAIL_CHAMADO}</td>
 				<td className="text-center  p-2">
                                     {c?.DTENVIO_CHAMADO?.replace("-", " ")}
@@ -1365,7 +1378,7 @@ export default function Home() {
 
                                     
                                     <form
-                                        action={"/api/upload"+c?.COD_CHAMADO}
+                                        action={"/api/upload?codChamado="+c?.COD_CHAMADO}
                                         method="post"
                                         encType="multipart/form-data"
                                         onClick={(e) => e.stopPropagation()}

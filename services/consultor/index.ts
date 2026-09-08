@@ -1,4 +1,5 @@
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
+import { decodeBlobText } from "../encoding";
 
 const readBlob = (blobFn: any): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -8,12 +9,12 @@ const readBlob = (blobFn: any): Promise<string> => {
             if (err) return reject(err);
             if (!stream) return resolve("");
 
-            let data = "";
+            const chunks: Buffer[] = [];
             stream.on("data", (chunk: Buffer) => {
-                data += chunk.toString("latin1"); // Corrige acentos
+                chunks.push(chunk);
             });
             stream.on("end", () => {
-                resolve(data); // Converte para UTF-8
+                resolve(decodeBlobText(Buffer.concat(chunks)));
             });
             stream.on("error", reject);
         });
@@ -22,18 +23,18 @@ const readBlob = (blobFn: any): Promise<string> => {
 
 async function findRecursoByName(nome: string): Promise<any[]> {
     return new Promise((resolve, reject) => {
-        Firebird.attach(options, (err: any, db: any) => {
+        getConnection( (err: any, db: any) => {
             if (err) return reject(err);
 
             const q = `SELECT * FROM recurso WHERE UPPER(NOME_RECURSO) LIKE ? ORDER BY NOME_RECURSO`;
             db.query(q, [`%${(nome || "").toUpperCase()}%`], async (err: any, result: any) => {
                 if (err) {
-                    db.detach();
+                    db?.detach();
                     return reject(err);
                 }
 
                 if (!result || !result.length) {
-                    db.detach();
+                    db?.detach();
                     return resolve([]);
                 }
 
@@ -51,10 +52,10 @@ async function findRecursoByName(nome: string): Promise<any[]> {
                         })
                     );
 
-                    db.detach();
+                    db?.detach();
                     resolve(result);
                 } catch (e) {
-                    db.detach();
+                    db?.detach();
                     reject(e);
                 }
             });

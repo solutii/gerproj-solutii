@@ -1,5 +1,5 @@
 import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 
 export default async function UpdateCallTaskService(
     COD_CHAMADO: number,
@@ -13,7 +13,7 @@ export default async function UpdateCallTaskService(
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -24,7 +24,7 @@ export default async function UpdateCallTaskService(
             const transaction: any = await new Promise((resolve, reject) => {
                 db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
                     if (err) {
-                        db.detach()
+                        db?.detach()
                         return reject(err)
                     }
                     return resolve(transaction)
@@ -36,7 +36,7 @@ export default async function UpdateCallTaskService(
                 transaction.query(`UPDATE CHAMADO SET CHAMADO.CODTRF_CHAMADO =? WHERE CHAMADO.COD_CHAMADO =?`,
                     [COD_TAREFA, COD_CHAMADO], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(true)
@@ -47,12 +47,12 @@ export default async function UpdateCallTaskService(
                 if (err) {
                     
                     transaction.rollback();
-                    db.detach();
+                    db?.detach();
                     return reject(err)
                 }
                 else {
                    
-                    db.detach();
+                    db?.detach();
                     return resolve(false)
                 }
 
@@ -61,7 +61,7 @@ export default async function UpdateCallTaskService(
 
 
         } catch (err) {
-            db.detach();
+            db?.detach();
             console.error(err)
             return reject(err)
         }

@@ -3,14 +3,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 import AdmZip  from 'adm-zip'
 import fs from 'fs';
 import path from 'path';
- 
+import { getAnexosBasePath } from '@/services/anexos';
+
 async function handler(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const codChamado = searchParams.get('codChamado')
-  
+
   try {
 
-    const folderPath = path.resolve('C:\\GERPROJ\\Dropbox\\DOC\\CALLTECH\\'+codChamado);
+    const folderPath = path.resolve(path.join(getAnexosBasePath(), 'CALLTECH', String(codChamado)));
 
     if (!fs.existsSync(folderPath)) {
         return NextResponse.json({ message: 'Chamado sem anexo!', caminho: folderPath });

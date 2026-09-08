@@ -1,4 +1,4 @@
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 
 export class MacExistsError extends Error {
     constructor() {
@@ -23,7 +23,7 @@ export async function InsertSaveService(mac: string, cnpj?: string, nome?: strin
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -36,7 +36,7 @@ export async function InsertSaveService(mac: string, cnpj?: string, nome?: strin
                     `SELECT MAC FROM SAVE WHERE MAC = ?`,
                     [mac], (err: any, result: any) => {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err)
                         }
                         return resolve(result.length > 0)
@@ -44,14 +44,14 @@ export async function InsertSaveService(mac: string, cnpj?: string, nome?: strin
             })
 
             if (exists) {
-                db.detach()
+                db?.detach()
                 return reject(new MacExistsError())
             }
 
             const transaction: any = await new Promise((resolve, reject) => {
                 db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
                     if (err) {
-                        db.detach()
+                        db?.detach()
                         return reject(err)
                     }
                     return resolve(transaction)
@@ -70,7 +70,7 @@ export async function InsertSaveService(mac: string, cnpj?: string, nome?: strin
 
                         if (err) {
                             transaction.rollback();
-                            db.detach()
+                            db?.detach()
                             return reject(err)
                         }
 
@@ -84,13 +84,13 @@ export async function InsertSaveService(mac: string, cnpj?: string, nome?: strin
                     return reject(err)
                 }
                 else {
-                    db.detach();
+                    db?.detach();
                     return resolve(true)
                 }
             });
 
         } catch (err) {
-            db.detach();
+            db?.detach();
             return reject(err)
         }
     })
@@ -100,7 +100,7 @@ export async function GetSaveService(mac: string): Promise<{ LIBERADO: boolean, 
 
     return new Promise((resolve, reject) => {
 
-        Firebird.attach(options, (err: any, db: any) => {
+        getConnection( (err: any, db: any) => {
             if (err) return reject(err);
 
             db.query(
@@ -108,17 +108,17 @@ export async function GetSaveService(mac: string): Promise<{ LIBERADO: boolean, 
                 [mac],
                 (err: any, result: any) => {
                     if (err) {
-                        db.detach();
+                        db?.detach();
                         return reject(err);
                     }
 
                     if (!result.length) {
-                        db.detach();
+                        db?.detach();
                         return resolve(null);
                     }
 
                     const row = result[0];
-                    db.detach();
+                    db?.detach();
 
                     if (row['LIBERADO'] != 1) {
                         return resolve({ LIBERADO: false });

@@ -1,5 +1,5 @@
 import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 
 export default async function ClassificacaoService(): Promise<any> {
 
@@ -11,7 +11,7 @@ export default async function ClassificacaoService(): Promise<any> {
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -28,20 +28,20 @@ export default async function ClassificacaoService(): Promise<any> {
                         WHERE CLASSIFICACAO.ATIVO_CLASSIFICACAO = 'SIM' AND CLASSIFICACAO.COD_CLASSIFICACAO <> 0`,
                     [], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(res)
                     })
             })
 
-            db.detach();
+            db?.detach();
 
             return resolve(tasks)
 
 
         } catch (err) {
-            db.detach();
+            db?.detach();
             return reject(err)
         }
     })

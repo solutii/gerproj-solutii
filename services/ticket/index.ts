@@ -1,4 +1,5 @@
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
+import { decodeBlobText } from "../encoding";
 
 const readBlob = (blobFn: any): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -17,14 +18,14 @@ const readBlob = (blobFn: any): Promise<string> => {
                     return resolve("");
                 }
 
-                let data = "";
+                const chunks: Buffer[] = [];
                 stream.on("data", (chunk: Buffer) => {
-                    data += chunk.toString("latin1"); // Corrige acentos
+                    chunks.push(chunk);
                 });
                 stream.on("end", () => {
                     if (settled) return;
                     settled = true;
-                    resolve(data); // Converte para UTF-8
+                    resolve(decodeBlobText(Buffer.concat(chunks)));
                 });
                 stream.on("error", (e: any) => {
                     if (settled) return;
@@ -43,7 +44,7 @@ const readBlob = (blobFn: any): Promise<string> => {
 
 async function findChamado(stats: string, client: string, consultant: string, cursor: number = 0): Promise<any[]> {
     return new Promise((resolve, reject) => {
-        Firebird.attach(options, (err: any, db: any) => {
+        getConnection( (err: any, db: any) => {
             if (err) return reject(err);
 
             const q = `
@@ -70,12 +71,12 @@ async function findChamado(stats: string, client: string, consultant: string, cu
             ], async (err: any, result: any) => {
 
                 if (err) {
-                    db.detach();
+                    db?.detach();
                     return reject(err);
                 }
 
                 if (!result || !result.length) {
-                    db.detach();
+                    db?.detach();
                     return resolve([]);
                 }
 
@@ -96,10 +97,10 @@ async function findChamado(stats: string, client: string, consultant: string, cu
                         }
                     }
 
-                    db.detach();
+                    db?.detach();
                     resolve(result);
                 } catch (e) {
-                    db.detach();
+                    db?.detach();
                     console.log('passou aqui no catch', e);
                     reject(e);
                 }

@@ -1,4 +1,4 @@
-import { Firebird, options } from "../../../services/firebird";
+import { Firebird, getConnection } from "../../../services/firebird";
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     }
 
     const areasResult = await new Promise((resolve, reject) => {
-      Firebird.attach(options, (attachErr: any, db: any) => {
+      getConnection( (attachErr: any, db: any) => {
         if (attachErr) return reject(attachErr);
 
         const sql = `
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         `;
 
         db.query(sql, [codRecurso], (queryErr: any, rows: any) => {
-          db.detach();
+          db?.detach();
           if (queryErr) return reject(queryErr);
 
           resolve((rows || []).map((r: any) => {

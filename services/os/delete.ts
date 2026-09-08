@@ -1,5 +1,5 @@
 import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 
 export default async function DeleteOsService(codOs: any): Promise<boolean> {
 
@@ -11,7 +11,7 @@ export default async function DeleteOsService(codOs: any): Promise<boolean> {
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -24,7 +24,7 @@ export default async function DeleteOsService(codOs: any): Promise<boolean> {
             const transaction: any = await new Promise((resolve, reject) => {
                 db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
                     if (err) {
-                        db.detach()
+                        db?.detach()
                         return reject(err)
                     }
                     return resolve(transaction)
@@ -43,7 +43,7 @@ export default async function DeleteOsService(codOs: any): Promise<boolean> {
                         if (err) {
                             
                             transaction.rollback();
-                            db.detach()
+                            db?.detach()
                             return reject(err)
                         }
 
@@ -62,19 +62,19 @@ export default async function DeleteOsService(codOs: any): Promise<boolean> {
                     return reject(err)
                 }
                 else {
-                    db.detach();
+                    db?.detach();
                     return resolve(true)
                 }
 
             });
 
-            db.detach()
+            db?.detach()
             resolve(true)
 
 
         } catch (err) {
             console.log(err)
-            db.detach();
+            db?.detach();
             return reject(err)
         }
     })

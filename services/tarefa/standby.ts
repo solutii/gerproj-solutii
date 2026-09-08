@@ -1,5 +1,5 @@
 import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 import iconv from "iconv-lite"
 
 export default async function UpdateCallService(
@@ -19,7 +19,7 @@ export default async function UpdateCallService(
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -32,7 +32,7 @@ export default async function UpdateCallService(
                 db.query(`SELECT MAX(COD_HISTCHAMADO) + 1 as ID FROM HISTCHAMADO`,
                     [], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(res[0]['ID'])
@@ -42,7 +42,7 @@ export default async function UpdateCallService(
             const transaction: any = await new Promise((resolve, reject) => {
                 db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
                     if (err) {
-                        db.detach()
+                        db?.detach()
                         return reject(err)
                     }
                     return resolve(transaction)
@@ -55,7 +55,7 @@ export default async function UpdateCallService(
                         UPDATE CHAMADO SET STATUS_CHAMADO = ? WHERE COD_CHAMADO = ?`,
                     [state, chamado.COD_CHAMADO], async function (err: any, result: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             transaction.rollback();
                             return reject(err)
                         }
@@ -78,7 +78,7 @@ export default async function UpdateCallService(
 
                         if (err) {
                             transaction.rollback();
-                            db.detach()
+                            db?.detach()
                             return reject(err)
                         }
 
@@ -107,7 +107,7 @@ export default async function UpdateCallService(
 
                     ], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(res)
@@ -119,7 +119,7 @@ export default async function UpdateCallService(
                 db.query(`SELECT MAX(COD_OS) + 1 as COD_OS, MAX(NUM_OS) as NUM_OS FROM OS`,
                     [], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve([res[0]['COD_OS'], res[0]['NUM_OS']])
@@ -127,19 +127,6 @@ export default async function UpdateCallService(
             })
             
             NUM_OS = `000${String( parseInt(NUM_OS as string)+1)}`.slice(-6)
-
-            console.log(NUM_OS_MATER)
-            console.log(`SELECT Max(OS.num_os) as num_os FROM
-                            OS
-                                INNER JOIN
-                            CHAMADO on CHAMADO.cod_chamado = OS.chamado_os
-                                INNER JOIN
-                            TAREFA  on TAREFA.cod_tarefa = OS.codtrf_os
-
-                            WHERE
-                            CHAMADO.cod_chamado = ${chamado.COD_CHAMADO}
-                            and TAREFA.cod_tarefa = ${chamado.CODTRF_CHAMADO??task[0].COD_TAREFA}
-                            and OS.codrec_os = ${chamado.COD_RECURSO}`)
 
             if(NUM_OS_MATER[0]) {
                 NUM_OS = NUM_OS_MATER[0]
@@ -199,7 +186,7 @@ export default async function UpdateCallService(
                         if (err) {
                             console.log(10,err)
                             transaction.rollback();
-                            db.detach()
+                            db?.detach()
                             return reject(err)
                         }
 
@@ -223,7 +210,7 @@ export default async function UpdateCallService(
                 }
                 else {
                     console.log(9)
-                    db.detach();
+                    db?.detach();
                     return resolve(true)
                 }
 
@@ -232,7 +219,7 @@ export default async function UpdateCallService(
 
         } catch (err) {
             console.log(10, err)
-            db.detach();
+            db?.detach();
             return reject(err)
         }
     })

@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 
 // Gera o link de validação sem login (token assinado, ver
 // /api/gerar-link-validacao no dashboard). Se a chamada falhar por
@@ -58,7 +58,7 @@ export async function sendEmail(
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -75,7 +75,7 @@ export async function sendEmail(
                     where cod_chamado =? `,
                     [chamado.numero], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(res)
@@ -87,20 +87,20 @@ export async function sendEmail(
                 db.query(`SELECT * from PARAMETROS `,
                     [chamado.numero], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(res)
                     })
             })
 
-            db.detach();
+            db?.detach();
 
             return resolve([])
 
 
         } catch (err) {
-            db.detach();
+            db?.detach();
             return reject(err)
         }
     })

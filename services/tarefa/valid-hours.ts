@@ -1,5 +1,5 @@
 import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
 
 export default async function ValidHoursService(
     chamado: any,
@@ -16,7 +16,7 @@ export default async function ValidHoursService(
         try {
 
             db = await new Promise((resolve, reject) => {
-                Firebird.attach(options, (err: any, db: any) => {
+                getConnection( (err: any, db: any) => {
                     if (err) {
                         return reject(err)
                     }
@@ -29,7 +29,7 @@ export default async function ValidHoursService(
                 db.query(`SELECT COD_TAREFA, HRREAL_TAREFA, PERIMP_TAREFA FROM TAREFA WHERE COD_TAREFA = ?`,
                     [chamado], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve([res[0]['COD_TAREFA'], res[0]['HRREAL_TAREFA'], res[0]['PERIMP_TAREFA']])
@@ -46,15 +46,12 @@ export default async function ValidHoursService(
                 0
             ).toISOString().slice(0, 10);
 
-             
-            console.log(`select HRINI_OS, HRFIM_OS from OS where CODTRF_OS =  ${codTarefa}  and dtini_os >= ${firstDayOfMonth} and dtini_os <= ${lastDayOfMonth}`)
-
             let responseHrsTotais: [] = await new Promise((resolve, reject) => {
 
                 db.query(`select HRINI_OS, HRFIM_OS from OS where CODTRF_OS =  ?  and dtini_os >= ? and dtini_os <= ?`,
                     [codTarefa, firstDayOfMonth, lastDayOfMonth], async function (err: any, res: any) {
                         if (err) {
-                            db.detach()
+                            db?.detach()
                             return reject(err);
                         }
                         return resolve(res)
@@ -90,7 +87,7 @@ export default async function ValidHoursService(
             return resolve([limmesTarefaMin, minTotais, perimpTarefa])
 
         } catch (err) {
-            db.detach();
+            db?.detach();
 
             console.log("+================================================+")
             console.log("Código da tarefa", chamado)

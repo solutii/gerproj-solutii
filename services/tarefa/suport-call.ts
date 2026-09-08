@@ -1,12 +1,13 @@
 import { ChamadosType } from "@/models/chamados";
-import { Firebird, options } from "../firebird";
+import { Firebird, getConnection } from "../firebird";
+import { decodeBlobText } from "../encoding";
 import iconv from 'iconv-lite'
 export default async function SuportCallService(recurso: string): Promise<ChamadosType[]> {
     
 
     return new Promise((resolve, reject) => {
 
-        Firebird.attach(options, function (err: any, db: any) {
+        getConnection( function (err: any, db: any) {
 
             if (err) {
                 return reject(err)
@@ -48,11 +49,11 @@ export default async function SuportCallService(recurso: string): Promise<Chamad
                 if (err) return rejectBlob(err);
                 if (!eventEmitter) return resolveBlob("");
 
-                let data = "";
+                const chunks: Buffer[] = [];
                 eventEmitter.on("data", (chunk: Buffer) => {
-                  data += chunk.toString("latin1");
+                  chunks.push(chunk);
                 });
-                eventEmitter.on("end", () => resolveBlob(data));
+                eventEmitter.on("end", () => resolveBlob(decodeBlobText(Buffer.concat(chunks))));
                 eventEmitter.on("error", rejectBlob);
               });
             });
@@ -85,10 +86,10 @@ export default async function SuportCallService(recurso: string): Promise<Chamad
               })
             );
 
-            db.detach();
+            db?.detach();
             return resolve(result as ChamadosType[]);
           } catch (e) {
-            db.detach();
+            db?.detach();
             return reject(e);
           }
         });
