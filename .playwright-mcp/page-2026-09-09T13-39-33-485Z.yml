@@ -1,0 +1,19 @@
+- generic [ref=f24e1]:
+  - main [ref=f24e2]:
+    - generic [ref=f24e3]:
+      - generic [ref=f24e4]:
+        - heading "Solutii Sistemas" [level=1] [ref=f24e5]
+        - paragraph [ref=f24e6]: GerProj · Painel de Chamados
+      - generic [ref=f24e7]:
+        - generic [ref=f24e8]:
+          - generic [ref=f24e9]: Usuário
+          - textbox "Usuário" [active] [ref=f24e11]:
+            - /placeholder: solutii.s
+        - generic [ref=f24e12]:
+          - generic [ref=f24e13]: Senha
+          - generic [ref=f24e14]:
+            - textbox "Senha" [ref=f24e15]
+            - button "Mostrar senha" [ref=f24e16] [cursor=pointer]
+        - button "Entrar" [ref=f24e20] [cursor=pointer]
+      - paragraph [ref=f24e21]: © 2026 Solutii Sistemas
+  - alert [ref=f24e22]

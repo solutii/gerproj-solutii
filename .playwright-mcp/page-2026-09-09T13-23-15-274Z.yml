@@ -1,0 +1,53 @@
+- generic [active] [ref=f12e1]:
+  - main [ref=f12e2]:
+    - generic [ref=f12e5]:
+      - generic [ref=f12e6]:
+        - heading "Solutii Sistemas" [level=1] [ref=f12e7]
+        - generic [ref=f12e8]: "|"
+        - paragraph [ref=f12e9]: ROGERIO JUNIO LOPES FERREIRA
+      - generic [ref=f12e10]:
+        - button "Área Atuação" [ref=f12e11] [cursor=pointer]
+        - button "Logout" [ref=f12e12] [cursor=pointer]
+    - generic [ref=f12e13]:
+      - generic [ref=f12e14]:
+        - button "Chamados" [ref=f12e15] [cursor=pointer]
+        - button "Tarefas / OS" [ref=f12e16] [cursor=pointer]
+      - table [ref=f12e92]:
+        - rowgroup [ref=f12e93]:
+          - row [ref=f12e94]:
+            - columnheader "Número" [ref=f12e95] [cursor=pointer]
+            - columnheader "Assunto" [ref=f12e96] [cursor=pointer]
+            - columnheader "Cliente" [ref=f12e97]
+            - columnheader "Hora Tarefa" [ref=f12e98]
+            - columnheader "Data" [ref=f12e99] [cursor=pointer]
+            - columnheader "Ações" [ref=f12e100]
+        - rowgroup [ref=f12e101]:
+          - row [ref=f12e102] [cursor=pointer]:
+            - cell "1.099" [ref=f12e103]
+            - cell "HORAS INTERNAS" [ref=f12e104]
+            - cell "SOLUTII SISTEMAS" [ref=f12e105]
+            - cell "3612.75h" [ref=f12e106]
+            - cell "09/04/2018" [ref=f12e107]
+            - cell "APONTAMENTO" [ref=f12e108]:
+              - img "APONTAMENTO" [ref=f12e109]
+          - row [ref=f12e117] [cursor=pointer]:
+            - cell "1.707" [ref=f12e118]
+            - cell "DESENVOLVIMENTO E MELHORIA TATOOBAY" [ref=f12e119]
+            - cell "TATTOOBAY" [ref=f12e120]
+            - cell "100h" [ref=f12e121]
+            - cell "23/09/2025" [ref=f12e122]
+            - cell "APONTAMENTO" [ref=f12e123]:
+              - img "APONTAMENTO" [ref=f12e124]
+          - row [ref=f12e132] [cursor=pointer]:
+            - cell "1.783" [ref=f12e133]
+            - cell "TREINAMENTO" [ref=f12e134]
+            - cell "PORTO SECO SUL DE MINAS" [ref=f12e135]
+            - cell "16h" [ref=f12e136]
+            - cell "02/06/2026" [ref=f12e137]
+            - cell "APONTAMENTO" [ref=f12e138]:
+              - img "APONTAMENTO" [ref=f12e139]
+      - generic [ref=f12e31]:
+        - textbox [ref=f12e32]:
+          - /placeholder: Selecione uma data
+        - img [ref=f12e33] [cursor=pointer]
+  - alert [ref=f12e89]

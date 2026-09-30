@@ -1,0 +1,53 @@
+- generic [ref=f26e1]:
+  - main [ref=f26e2]:
+    - generic [ref=f26e5]:
+      - generic [ref=f26e6]:
+        - heading "Solutii Sistemas" [level=1] [ref=f26e7]
+        - generic [ref=f26e8]: "|"
+        - paragraph [ref=f26e9]: ROGERIO JUNIO LOPES FERREIRA
+      - generic [ref=f26e10]:
+        - button "Área Atuação" [ref=f26e11] [cursor=pointer]
+        - button "Logout" [ref=f26e12] [cursor=pointer]
+    - generic [ref=f26e13]:
+      - generic [ref=f26e14]:
+        - button "Chamados" [ref=f26e15] [cursor=pointer]
+        - button "Tarefas / OS" [active] [ref=f26e16] [cursor=pointer]
+      - table [ref=f26e94]:
+        - rowgroup [ref=f26e95]:
+          - row [ref=f26e96]:
+            - columnheader "Número" [ref=f26e97] [cursor=pointer]
+            - columnheader "Assunto" [ref=f26e98] [cursor=pointer]
+            - columnheader "Cliente" [ref=f26e99]
+            - columnheader "Hora Tarefa" [ref=f26e100]
+            - columnheader "Data" [ref=f26e101] [cursor=pointer]
+            - columnheader "Ações" [ref=f26e102]
+        - rowgroup [ref=f26e103]:
+          - row [ref=f26e104] [cursor=pointer]:
+            - cell "1.099" [ref=f26e105]
+            - cell "HORAS INTERNAS" [ref=f26e106]
+            - cell "SOLUTII SISTEMAS" [ref=f26e107]
+            - cell "3612.75h" [ref=f26e108]
+            - cell "09/04/2018" [ref=f26e109]
+            - cell [ref=f26e110]:
+              - img "APONTAMENTO" [ref=f26e112]
+          - row [ref=f26e120] [cursor=pointer]:
+            - cell "1.707" [ref=f26e121]
+            - cell "DESENVOLVIMENTO E MELHORIA TATOOBAY" [ref=f26e122]
+            - cell "TATTOOBAY" [ref=f26e123]
+            - cell "100h" [ref=f26e124]
+            - cell "23/09/2025" [ref=f26e125]
+            - cell [ref=f26e126]:
+              - img "APONTAMENTO" [ref=f26e128]
+          - row [ref=f26e136] [cursor=pointer]:
+            - cell "1.783" [ref=f26e137]
+            - cell "TREINAMENTO" [ref=f26e138]
+            - cell "PORTO SECO SUL DE MINAS" [ref=f26e139]
+            - cell "16h" [ref=f26e140]
+            - cell "02/06/2026" [ref=f26e141]
+            - cell [ref=f26e142]:
+              - img "APONTAMENTO" [ref=f26e144]
+      - generic [ref=f26e31]:
+        - textbox [ref=f26e32]:
+          - /placeholder: Selecione uma data
+        - img [ref=f26e33] [cursor=pointer]
+  - alert [ref=f26e91]

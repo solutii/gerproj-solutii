@@ -1,0 +1,45 @@
+ROTAS REMOVIDAS DA API
+======================
+
+Esta pasta guarda as rotas da API que foram removidas do sistema por segurança
+(a tela não usava nenhuma delas e elas devolviam dados de qualquer cliente ou
+consultor para qualquer usuário logado). Cada uma está salva aqui como
+"route.ts.removida", exatamente como era antes da remoção.
+
+  ticket ...... POST /api/ticket     (lista chamados por status/cliente/consultor)
+  tocfrio ..... POST /api/tocfrio    (mesma consulta do ticket)
+  cliente ..... POST /api/cliente    (busca cliente por nome)
+  consultor ... POST /api/consultor  (busca consultor por nome)
+  save ........ GET/POST /api/save   (registro de MAC/CNPJ/NOME)
+
+Os serviços que só elas usavam também foram removidos de src/services e estão
+guardados em rotas-removidas/services/<nome>/index.ts.removida (ticket, cliente,
+consultor e save; o tocfrio usa o serviço do ticket). O restaurar.bat devolve a
+rota e o serviço dela juntos.
+
+
+COMO RESTAURAR (se alguma integração parar de funcionar)
+--------------------------------------------------------
+
+  Opção 1 - script (recomendado). Na pasta rotas-removidas:
+
+      restaurar.bat                 (restaura todas)
+      restaurar.bat ticket          (só uma)
+      restaurar.bat cliente save    (mais de uma)
+
+  Opção 2 - à mão: copie  rotas-removidas\<nome>\route.ts.removida  para
+      src\app\api\<nome>\route.ts  e  rotas-removidas\services\<serviço>\
+      index.ts.removida  para  src\services\<serviço>\index.ts  (criando as
+      pastas, se precisar). O tocfrio usa o serviço "ticket".
+
+  Opção 3 - git:  git checkout HEAD -- src/app/api/<nome> src/services/<serviço>
+      (só se já estavam commitados; a rota "save" mudou depois do último
+      commit, então use a opção 1 ou 2 para ela.)
+
+Depois de restaurar:
+  1. pnpm build
+  2. copie o .next novo para o servidor e reinicie (ver rotina_deploy.txt).
+
+ATENÇÃO: ao restaurar, a rota volta a exigir login (middleware), mas sem a
+checagem de "consultor da sessão". Se for restaurar de forma permanente, vale
+pedir para aplicar a mesma proteção das demais rotas (src/services/permissao.ts).

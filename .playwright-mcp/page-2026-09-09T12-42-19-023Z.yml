@@ -1,0 +1,56 @@
+- generic [ref=f8e1]:
+  - alert [ref=f8e2]
+  - main [ref=f8e23]:
+    - generic [ref=f8e26]:
+      - generic [ref=f8e27]:
+        - heading "Solutii Sistemas" [level=1] [ref=f8e28]
+        - generic [ref=f8e29]: "|"
+        - paragraph [ref=f8e30]: ROGERIO JUNIO LOPES FERREIRA
+      - generic [ref=f8e31]:
+        - button "Área Atuação" [ref=f8e32] [cursor=pointer]
+        - button "Logout" [ref=f8e33] [cursor=pointer]
+    - generic [ref=f8e34]:
+      - generic [ref=f8e35]:
+        - button "Chamados" [active] [ref=f8e36] [cursor=pointer]
+        - button "Tarefas / OS" [ref=f8e37] [cursor=pointer]
+      - table [ref=f8e2091]:
+        - rowgroup [ref=f8e2092]:
+          - row [ref=f8e2093]:
+            - columnheader "Número" [ref=f8e2094] [cursor=pointer]
+            - columnheader "Assunto" [ref=f8e2095] [cursor=pointer]
+            - columnheader "E-mail" [ref=f8e2096]
+            - columnheader "Data" [ref=f8e2097] [cursor=pointer]
+            - columnheader "Status" [ref=f8e2098] [cursor=pointer]
+            - columnheader "Ações" [ref=f8e2099]
+            - columnheader "Arquivos" [ref=f8e2100]
+        - rowgroup [ref=f8e2101]:
+          - row [ref=f8e2102] [cursor=pointer]:
+            - cell "15.102" [ref=f8e2103]
+            - cell "[CLIENTE] Testando as alterações do fluxo5b" [ref=f8e2104]
+            - cell "rogerio.jlf@gmail.com" [ref=f8e2105]
+            - cell "08/09/2026 12:03" [ref=f8e2106]
+            - cell "ATRIBUIDO" [ref=f8e2107]
+            - cell "EM ATENDIMENTO" [ref=f8e2109]:
+              - img "EM ATENDIMENTO" [ref=f8e2110]
+            - cell [ref=f8e2116]:
+              - generic [ref=f8e2117]:
+                - img "Upload" [ref=f8e2120]
+                - link [ref=f8e2123]:
+                  - /url: /api/arquivos?codChamado=15102
+          - row [ref=f8e2126] [cursor=pointer]:
+            - cell "15.042" [ref=f8e2127]
+            - cell "[DOX] Ajustes levantados na reuniao APP-DOX" [ref=f8e2128]
+            - cell "cassio.ramalho@solutii.com.br" [ref=f8e2129]
+            - cell "24/08/2026 15:30" [ref=f8e2130]
+            - cell "ATRIBUIDO" [ref=f8e2131]
+            - cell "EM ATENDIMENTO" [ref=f8e2133]:
+              - img "EM ATENDIMENTO" [ref=f8e2134]
+            - cell [ref=f8e2140]:
+              - generic [ref=f8e2141]:
+                - img "Upload" [ref=f8e2144]
+                - link [ref=f8e2147]:
+                  - /url: /api/arquivos?codChamado=15042
+      - generic [ref=f8e101]:
+        - textbox [ref=f8e102]:
+          - /placeholder: Selecione uma data
+        - img [ref=f8e103] [cursor=pointer]

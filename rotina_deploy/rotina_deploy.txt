@@ -1,0 +1,102 @@
+ROTINA DE DEPLOY - gerproj-solutii
+===================================
+
+Servidor:  C:\GERPROJ\web-app-2
+Porta:     3000  (acesso: solutii.ddns.net:3000)
+Inicia por: execGerProj.bat  (roda "pnpm start")
+
+
+PASSO A PASSO (toda vez que for colocar alterações no ar)
+---------------------------------------------------------
+
+NA SUA MÁQUINA (pasta gerproj-solutii):
+
+  1. Gere o build:
+
+         pnpm build
+
+     - Se der erro, NÃO copie nada para o servidor.
+     - Faça o build logo antes de copiar, para garantir que a pasta .next
+       não é de um "next dev" rodado depois.
+
+NO SERVIDOR (C:\GERPROJ\web-app-2):
+
+  2. Feche a janela do "next-server" (a que o .bat abriu).
+
+  3. Apague a pasta .next antiga e cole a nova no lugar.
+     (Apagar antes evita sobrar arquivo velho misturado.)
+
+  4. Abra o execGerProj.bat de novo.
+     Deve aparecer "Ready" e "Local: http://localhost:3000".
+
+
+SÓ QUANDO NECESSÁRIO
+--------------------
+
+  - MUDOU DEPENDÊNCIA (adicionou, removeu ou atualizou pacote):
+      Copie também package.json e pnpm-lock.yaml (SEMPRE OS DOIS JUNTOS).
+      Depois, no servidor, ANTES de subir o app:
+
+          pnpm install --frozen-lockfile --prod
+
+      Se só mexeu em código, não precisa reinstalar nada.
+
+  - MUDOU VARIÁVEL DE AMBIENTE:
+      Edite o .env do servidor (ou copie o .env novo).
+      O .env do servidor PRECISA ter:
+
+          NEXTAUTH_URL=http://solutii.ddns.net:3000
+
+  - MUDOU O .BAT:
+      Copie o execGerProj.bat.
+
+
+REGRAS IMPORTANTES
+------------------
+
+  * NUNCA copie a pasta node_modules para o servidor.
+    O pnpm usa "junctions" que guardam o caminho absoluto de onde foram
+    criadas, então uma cópia quebra no servidor.
+
+  * Instale sempre com PNPM (nunca "npm install").
+    Só o pnpm aplica o patch do node-firebird (patches\node-firebird.patch),
+    que corrige os acentos (banco em WIN1252). Sem ele, os acentos ficam
+    corrompidos ao ler e ao gravar no banco.
+    (Precisam existir no servidor: pnpm-workspace.yaml e a pasta patches\)
+
+  * Não use "--no-frozen-lockfile" no servidor: ele resolveria versões
+    diferentes das que você testou.
+
+  * A porta de PRODUÇÃO é 3000. A 3001 é só do "pnpm dev" na sua máquina.
+
+
+PROBLEMAS CONHECIDOS
+--------------------
+
+  Erro: Cannot find module 'styled-jsx/package.json'
+    -> O node_modules foi copiado. Apague e reinstale no servidor:
+           Remove-Item -Recurse -Force node_modules
+           pnpm install --frozen-lockfile --prod
+
+  Erro: ERR_PNPM_OUTDATED_LOCKFILE
+    -> O pnpm-lock.yaml do servidor está desatualizado em relação ao
+       package.json. Copie o pnpm-lock.yaml da sua máquina.
+
+  ERR_CONNECTION_TIMED_OUT no navegador
+    -> Confira se o servidor está na porta 3000 (linha "Local:" no console).
+       Teste abrir http://localhost:3000 no próprio servidor: se abrir lá, o
+       bloqueio é de rede (firewall / redirecionamento de porta).
+
+  Depois do login, o navegador vai para "localhost:3000/home"
+    -> Faltou NEXTAUTH_URL no .env do servidor (veja acima). Basta corrigir
+       e reabrir o .bat; não precisa de novo build.
+
+  Acentos aparecendo como "Ã§" ou "�"
+    -> O patch do node-firebird não foi aplicado (instalou sem pnpm).
+       Para verificar, no PowerShell do servidor (deve retornar 2 linhas):
+
+           Select-String -Path "C:\GERPROJ\web-app-2\node_modules\.pnpm\node-firebird*\node_modules\node-firebird\lib\wire\serialize.js" -Pattern "PATCH \(gerproj-solutii"
+
+  Observação: o Select-String só existe no PowerShell. No CMD comum, use
+  "findstr", ou digite "powershell" antes. Caminhos com colchetes, como
+  [codChamado], precisam de -LiteralPath no PowerShell.

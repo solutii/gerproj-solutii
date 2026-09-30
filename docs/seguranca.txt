@@ -1,0 +1,102 @@
+SEGURANÇA - gerproj-solutii
+============================
+
+Resumo do que está implementado e do que ainda está pendente. Complementa o
+arquivo travas-de-apontamento.txt (regras de negócio do apontamento).
+
+
+1. IMPLEMENTADO
+---------------
+
+1.1 Sessão e permissão nas rotas da API
+    - O middleware (src/middleware.ts) exige sessão em toda rota /api, exceto
+      /api/auth, /api/nfce, /api/six e /api/apibradesco (públicas por desenho).
+    - O consultor é sempre o da sessão (JWT), nunca o que vem na URL ou no
+      corpo. Listas, período, áreas de atuação e gravações usam o da sessão.
+    - Chamado/cliente/OS: o consultor só mexe no que é dele
+      (src/services/permissao.ts e src/services/os/regras-apontamento.ts).
+    - Anexos: código do chamado só com dígitos (evita "../") + chamado do
+      consultor; limite de 25 MB por arquivo; a resposta não mostra o caminho
+      da pasta do servidor.
+
+1.2 Rotas que alteram dados só aceitam POST
+    change-status, start, standby, apoint, update e delete não respondem mais
+    a GET (um link em outro site não consegue mais dispará-las).
+
+1.3 Rotas removidas (não eram usadas pela tela)
+    /api/os/details (iniciava chamado via GET), /api/os/insert, /api/script,
+    /api/call/apoint e /api/call/update.
+    Também removidas: /api/ticket, /api/tocfrio, /api/cliente, /api/consultor e
+    /api/save (devolviam dados de qualquer cliente/consultor a qualquer usuário
+    logado). Os serviços que só elas usavam (ticket, cliente, consultor e save)
+    também saíram de src/services. Tudo está guardado em rotas-removidas/ e volta com
+    "rotas-removidas\restaurar.bat" (ver rotas-removidas/LEIA-ME.txt).
+
+1.4 Erros não vazam detalhe
+    Só mensagens de regra de negócio (classe ErroDeRegra) vão para a tela.
+    Erro de banco/bug vira "Não foi possível concluir a operação" (500) e o
+    detalhe fica no log do servidor (console.error).
+
+1.5 Login
+    - Limite de tentativas: 5 falhas em 15 min por IP + usuário (bloqueia 15
+      min) e 40 por IP. Mostra "Muitas tentativas de login...". Em memória:
+      reiniciar o servidor zera os contadores. Erro de banco não conta.
+    - O token de sessão guarda só COD_USUARIO, COD_RECURSO e DTLIMITE_RECURSO
+      (a linha inteira do usuário, com a senha, não vai mais para o token).
+    - O destino pós-login só aceita caminho do próprio site.
+    - Sessão expirada com a tela aberta: aviso e redirecionamento ao login.
+
+1.6 Cabeçalhos de segurança (next.config.mjs)
+    X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+    Permissions-Policy e sem X-Powered-By.
+
+1.7 Dependências atualizadas
+    next-auth 4.24.15 (corrige crítico), axios 1.20.0, adm-zip 0.6.1 e
+    nodemailer 10.0.10 (o servidor roda Node 24; o nodemailer 10 exige Node 20+).
+    Usei a 10.0.10 e não a 10.0.13 (mais nova) porque o pnpm bloqueia versões
+    publicadas há menos de 1 dia, como proteção contra pacote malicioso recém-
+    publicado; a 10.0.10 já corrige todas as falhas conhecidas (precisa de >=10.0.6).
+    Como package.json e pnpm-lock.yaml mudaram, no deploy copie os DOIS e rode
+    "pnpm install --frozen-lockfile --prod" no servidor (ver rotina_deploy.txt).
+
+
+1.8 Banco sem credencial padrão no código
+    src/services/firebird.ts não tem mais host, banco, usuário e senha padrão
+    (antes caía em SYSDBA + senha padrão do Firebird). O .env PRECISA ter
+    FIREBIRD_HOST, FIREBIRD_DATABASE, FIREBIRD_USER e FIREBIRD_PASSWORD (a porta
+    padrão é 3050). Se faltar alguma, o servidor sobe, registra no log "Variável
+    de ambiente ... não definida" e os acessos ao banco falham com essa mensagem.
+    Ainda vale usar, no futuro, um usuário de banco com menos poder que o SYSDBA.
+
+
+1.9 NEXTAUTH_SECRET forte
+    Trocado por um segredo aleatório de 64 caracteres (antes: 29). Ele assina e
+    criptografa o cookie de sessão. No SERVIDOR só vale depois de o .env novo
+    ser copiado e o sistema reiniciado; nesse momento todos os usuários são
+    deslogados uma vez (o cookie antigo não abre mais). Para trocar de novo:
+    gerar com "openssl rand -base64 48" ou "node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
+    e nunca colocar o valor em chat, e-mail ou git.
+
+
+2. PENDENTE (precisa de decisão ou de infraestrutura)
+-----------------------------------------------------
+
+2.1 HTTPS  (PRIORIDADE MÁXIMA)
+    O site roda em http://solutii.ddns.net:3000, sem criptografia: login e
+    senha trafegam em texto puro e o cookie de sessão não pode ter a flag
+    Secure. Solução: proxy reverso com certificado (Caddy, nginx, IIS,
+    Cloudflare...). Depois disso, definir NEXTAUTH_URL com https://.
+
+2.2 Next.js 14 -> 15
+    O Next 14.2.x tem vulnerabilidades críticas/altas só corrigidas na 15.5.21
+    ou mais (troca de versão maior). O dashboard já usa o Next 15. Fazer como
+    projeto separado, com testes e build.
+
+2.3 Senhas dos usuários (sistema legado em Delphi)
+    Guardadas com XOR de chave fixa (reversível) e comparadas sem diferenciar
+    maiúscula de minúscula. Só dá para corrigir junto com o Delphi. O limite
+    de tentativas (1.5) reduz o risco enquanto isso.
+
+2.4 puppeteer (usado só em src/nfe)
+    Traz várias dependências com vulnerabilidades (ws, ip-address, extract-zip).
+    Se o módulo NFC-e não for usado neste projeto, remover do package.json.

@@ -20,6 +20,10 @@
 .DS_Store
 *.pem
 
+# pacotes compactados (builds/deploy) -- não versionar
+*.zip
+*.rar
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -35,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright
+test-results/
+playwright-report/

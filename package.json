@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",
@@ -14,14 +17,15 @@
     "@hookform/resolvers": "^3.4.2",
     "@mui/material": "^5.15.19",
     "@mui/x-data-grid": "^7.6.2",
-    "adm-zip": "^0.5.16",
-    "axios": "^1.18.1",
+    "@tanstack/react-table": "^8.21.3",
+    "adm-zip": "^0.6.1",
+    "axios": "^1.20.0",
     "iconv-lite": "^0.6.3",
     "mime": "^4.1.0",
     "next": "14.2.35",
-    "next-auth": "^4.24.7",
+    "next-auth": "^4.24.15",
     "node-firebird": "^1.1.8",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^10.0.10",
     "puppeteer": "^24.35.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
@@ -29,20 +33,25 @@
     "react-dom": "^18",
     "react-hook-form": "^7.51.5",
     "react-icons": "^5.2.1",
-    "sweetalert2": "^11.14.1",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/adm-zip": "^0.5.5",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.4",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^6.1.1",
+    "dotenv": "^17.4.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
+    "jsdom": "^30.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.0"
   }
 }

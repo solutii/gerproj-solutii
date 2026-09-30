@@ -1,0 +1,259 @@
+TRAVAS DE APONTAMENTO - gerproj-solutii
+========================================
+
+Este documento lista todas as situações que impedem (ou exigem confirmação)
+ao apontar horas. Serve de referência para suporte e para quem for dar
+manutenção nas regras.
+
+Legenda:
+  [TELA]      a trava existe na tela (o usuário é avisado ou o botão fica
+              desabilitado).
+  [SERVIDOR]  a trava também existe no servidor, então vale mesmo que alguém
+              chame a API direto, sem passar pela tela.
+  [AVISO]     não trava: só pede confirmação.
+
+Tipos de lançamento que passam por estas regras:
+  - Apontamento em TAREFA ........ modal "Apontamento" (aba Tarefas)
+  - StandBy em CHAMADO ........... modal "StandBy" (aba Chamados)
+  - Editar OS .................... modal "Editar Apontamento"
+  - Excluir OS ................... botão da lixeira na lista de OS
+
+
+1. REGRAS COMUNS (Apontamento, StandBy e Editar OS)
+---------------------------------------------------
+
+1.1 Campos obrigatórios                                   [TELA] [SERVIDOR]
+    Descrição, hora inicial, hora final e data precisam estar preenchidos.
+    Na tela, o botão "Confirmar" fica desabilitado até tudo estar preenchido.
+    Mensagem: "Selecione uma data e hora inicial/final"
+
+1.2 Descrição com no mínimo 50 caracteres                 [TELA] [SERVIDOR]
+    Espaços no começo e no fim não contam. O campo mostra o contador
+    "N/50 caracteres (mínimo)" (vermelho até 50, verde depois).
+    Mensagem: "A descrição do apontamento precisa ter no mínimo 50
+    caracteres."
+    Observação: vale também no Editar OS. Uma OS antiga com descrição curta
+    só pode ser salva depois de a descrição chegar a 50 caracteres.
+
+1.3 Hora final maior que a hora inicial                   [TELA] [SERVIDOR]
+    Hora final igual à inicial (ex.: 10:00 e 10:00) ou menor é recusada.
+    Na tela, o select de hora final só lista horários depois da inicial e é
+    limpo se a inicial passar a ser igual ou maior que ela.
+    Mensagem: "A hora final precisa ser maior que a hora inicial."
+
+1.3.1 Horários de meia em meia hora                               [TELA]
+    Os selects só oferecem horários de 00:00 a 23:30, de 30 em 30 minutos.
+    (Exceção: no Editar OS, se a OS antiga tiver um horário fora da meia
+    hora, esse valor aparece como opção extra para não ficar em branco.)
+
+1.4 Horário que ainda não aconteceu                       [TELA] [SERVIDOR]
+    - Data depois de hoje: recusada.
+    - Hoje: a hora inicial e a hora final não podem ser depois do horário
+      atual. Ex.: agora são 17:05; não dá para apontar 20:00 às 21:00.
+    Na tela, com a data de hoje, os selects só listam horários até o
+    momento atual (17:05 -> até 17:00).
+    O "agora" é sempre o horário de Brasília (America/Sao_Paulo), na tela e
+    no servidor.
+    Mensagem: "Não é possível apontar horas que ainda não aconteceram.
+    Escolha um horário até o momento atual."
+
+1.5 Período vigente do consultor                          [TELA] [SERVIDOR]
+    A data do apontamento precisa estar dentro do período permitido:
+      - Consultor com PERMAPO_RECURSO = "SIM": da data DTLIMITE_RECURSO até
+        hoje.
+      - Demais consultores: somente ontem e hoje.
+    No Editar OS e na exclusão vale também para a data ORIGINAL da OS (OS
+    fora do período não pode ser alterada nem excluída).
+    Mensagem: "Selecione uma data dentro do período vigente."
+
+1.6 Conflito de horário com outro apontamento              [SERVIDOR]
+    O intervalo não pode cruzar outro apontamento do MESMO consultor no
+    MESMO dia (em qualquer chamado ou tarefa). Apontamentos que apenas
+    encostam (09:00-10:00 e 10:00-11:00) são permitidos. No Editar OS, a
+    própria OS é ignorada na comparação.
+    Mensagem: "Conflito de horário: você já tem o apontamento da OS #N das
+    HH:MM às HH:MM nesta data."
+
+1.7 Lançamento com mais de 7 horas                                [AVISO]
+    Se a duração passar de 7 horas (ex.: 09:00 às 16:30 = 7h30), a
+    confirmação do modal avisa a duração e pergunta se está correto. Não
+    trava: confirmando, o apontamento é gravado. Exatamente 7h não avisa.
+    Mensagem: "Atenção: este apontamento tem 7h30 (mais de 7 horas). Tem
+    certeza de que está correto? ..."
+
+1.8 Consultor vem da sessão                                [SERVIDOR]
+    O consultor do apontamento é sempre o usuário logado (lido da sessão),
+    nunca o que vem no corpo da requisição. Sem sessão válida a requisição
+    é recusada ("Não autenticado").
+
+
+2. APONTAMENTO EM TAREFA (modal "Apontamento")
+-----------------------------------------------
+
+2.1 Tarefa selecionada                                            [TELA]
+    É preciso selecionar uma tarefa na lista.
+    Mensagem: "Selecione um projeto!"
+
+2.2 Limite mensal de horas da tarefa                      [TELA] [SERVIDOR]
+    O sistema soma as horas já lançadas na tarefa no mês da data escolhida
+    (de TODOS os consultores) mais o apontamento novo. Se passar do limite e
+    a tarefa não permitir exceder, o apontamento é bloqueado.
+      - Limite usado: HRREAL_TAREFA (em horas; aceita casas decimais, ex.
+        4,8h = 288 min).
+      - Tarefa com PERIMP_TAREFA = "SIM" pode exceder: nunca trava.
+      - Limite 0 bloqueia qualquer apontamento (se PERIMP não for "SIM").
+      - Limite vazio (sem valor) não trava.
+    Mensagem: "Horas para esta tarefa já ultrapassaram o limite mensal (Xh),
+    impossível realizar o apontamento."
+
+
+3. STANDBY EM CHAMADO (modal "StandBy")
+----------------------------------------
+
+3.1 Chamado selecionado                                           [TELA]
+    Mensagem: "Selecione um chamado!"
+
+3.2 Chamado precisa ser do consultor logado                [SERVIDOR]
+    O chamado é conferido no banco (não no objeto enviado pela tela): o
+    COD_RECURSO do chamado precisa ser o do usuário logado.
+    Mensagem: "Este chamado não está atribuído a você."
+
+3.3 Chamado finalizado                                     [SERVIDOR]
+    Chamado com status FINALIZADO não pode receber StandBy/apontamento.
+    Mensagem: "Chamado já finalizado: não é possível alterar o status."
+
+3.4 Limite mensal de horas da tarefa do chamado           [TELA] [SERVIDOR]
+    Mesma ideia da regra 2.2, mas para a tarefa ligada ao chamado:
+      - Limite usado: LIMMES_TAREFA (limite mensal da tarefa, em horas).
+      - Limite 0 ou vazio significa "sem limite mensal": não trava.
+      - Tarefa com PERIMP_TAREFA = "SIM" pode exceder: nunca trava.
+      - Estourando o limite, o StandBy é bloqueado.
+    Mensagem: "Horas para esta tarefa já ultrapassaram o limite do mês,
+    total final após apontamento: Xh. ENTRE EM CONTATO COM A SOLUTII!"
+    Atenção: o apontamento em tarefa (2.2) usa HRREAL_TAREFA e o StandBy usa
+    LIMMES_TAREFA. São campos diferentes da tabela TAREFA; não foram
+    unificados de propósito (no banco, HRREAL_TAREFA parece ser o total de
+    horas da tarefa e LIMMES_TAREFA o limite mensal, preenchido em poucas
+    tarefas).
+
+
+4. EDITAR OS
+------------
+
+4.1 Botão de editar só aparece dentro do período                  [TELA]
+    Se a data da OS estiver fora do período vigente, os botões de editar e
+    excluir nem aparecem na lista.
+
+4.2 A OS precisa ser do consultor logado                   [SERVIDOR]
+    Mensagem: "Você só pode alterar os seus próprios apontamentos."
+    (OS inexistente: "OS não encontrada.")
+
+4.3 OS fora do período vigente                             [SERVIDOR]
+    Mensagem: "Esta OS está fora do período vigente e não pode ser
+    alterada."
+
+4.4 Regras comuns                                          [TELA] [SERVIDOR]
+    Valem as regras do item 1 (descrição, intervalo, horário futuro, nova
+    data no período, conflito de horário).
+
+4.5 Chamado finalizado                                    [SERVIDOR]
+    OS de chamado com status FINALIZADO não pode ser editada nem excluída.
+    Mensagem: "Chamado finalizado: não é possível alterar ou excluir os
+    apontamentos dele."
+
+4.6 Limite mensal de horas ao editar                      [SERVIDOR]
+    Só é conferido quando a edição AUMENTA a duração da OS (editar apenas
+    a descrição, ou reduzir as horas, nunca é bloqueado por causa do limite).
+      - OS de chamado: mesma regra do item 3.4 (LIMMES_TAREFA).
+      - OS de tarefa (sem chamado): mesma regra do item 2.2 (HRREAL_TAREFA).
+      - A própria OS não entra na soma do mês (não conta duas vezes).
+      - Se a OS não tiver tarefa ligada (dado antigo), o limite não é
+        conferido e a edição segue.
+    Mensagens: as mesmas dos itens 2.2 e 3.4.
+
+
+5. EXCLUIR OS
+-------------
+
+5.1 A OS precisa ser do consultor logado                   [SERVIDOR]
+5.2 A OS precisa estar dentro do período vigente           [SERVIDOR]
+5.3 A OS não pode ser de chamado finalizado                [SERVIDOR]
+    Mensagens: as mesmas dos itens 4.2, 4.3 e 4.5. A tela mostra o motivo em
+    um alerta.
+
+
+6. TRAVAS RELACIONADAS (mudança de status do chamado)
+------------------------------------------------------
+
+Não são apontamentos, mas aparecem no mesmo fluxo de trabalho:
+
+6.1 Colocar em AGUARDANDO VALIDACAO                 [TELA] [SERVIDOR]
+    Só é possível se o chamado estiver com status STANDBY.
+    Mensagem: "Chamado #N precisa estar com o status "STANDBY" para ser
+    alterado para "AGUARDANDO VALIDACAO"."
+
+6.2 Colocar em FINALIZADO                           [TELA] [SERVIDOR]
+    Só é possível se o chamado estiver com status AGUARDANDO VALIDACAO.
+    Mensagem: "Chamado #N precisa estar com o status "AGUARDANDO VALIDACAO"
+    para ser alterado para "FINALIZADO"."
+
+
+6.3 Acesso às rotas da API (consultor da sessão)            [SERVIDOR]
+    O consultor é sempre o da sessão; o que vem na URL ou no corpo é ignorado.
+      - Listas de chamados, de OS e de tarefas, período do consultor e áreas
+        de atuação: só devolvem/alteram dados do consultor logado.
+      - Iniciar, alterar status, escolher tarefa/classificação e listar
+        tarefas do chamado: o chamado precisa estar atribuído ao consultor
+        logado ("Este chamado não está atribuído a você.").
+      - Dados de acesso do cliente: o consultor precisa ter chamado desse
+        cliente ("Este cliente não possui chamados atribuídos a você.").
+      - Anexos (enviar e baixar): o código do chamado só aceita dígitos
+        ("Código de chamado inválido.") e o chamado precisa ser do consultor.
+      - Sem sessão: a API responde 401 ("Não autenticado"). Com a tela
+        aberta, a mensagem "Sua sessão expirou..." leva ao login.
+
+
+7. ORDEM DAS VERIFICAÇÕES NO SERVIDOR
+--------------------------------------
+
+Descrição -> campos preenchidos -> intervalo das horas -> horário futuro ->
+período vigente -> conflito de horário -> (Apontamento/StandBy) limite
+mensal de horas -> (StandBy) chamado finalizado.
+No StandBy, a checagem de que o chamado é do consultor vem antes de todas.
+No Editar e no Excluir, a checagem de dono, de período e de chamado
+finalizado da OS original vem antes das demais. No Editar, o limite mensal
+de horas (só quando a duração aumenta) vem depois do conflito de horário.
+A primeira regra que falhar interrompe a gravação e a mensagem aparece no
+alerta da tela. Nada é gravado quando alguma regra falha.
+
+
+8. ONDE ESTÁ IMPLEMENTADO
+-------------------------
+
+  Tela
+    src/app/(pages)/home/page.tsx ............................ validações ao confirmar
+    src/app/(pages)/home/_components/modals/CamposApontamento.tsx
+                                        ....................... selects, contador, data
+    src/app/(pages)/home/_components/modals/ApontamentoModal.tsx
+    src/app/(pages)/home/_components/modals/StandbyModal.tsx
+    src/app/(pages)/home/_components/modals/EditOsModal.tsx
+                                        ....................... botão Confirmar e aviso de 7h
+
+  Regras compartilhadas (tela + servidor), com testes
+    src/utils/descricao-apontamento.ts ....................... mínimo de 50 caracteres
+    src/utils/intervalo-horas.ts ............................. intervalo e aviso de 7h
+    src/utils/horario-futuro.ts .............................. horário no futuro (fuso de Brasília)
+    src/utils/limite-horas.ts ................................ estouro do limite mensal
+    src/utils/regras-apontamento.ts .......................... período e sobreposição (partes puras)
+
+  Servidor
+    src/services/os/regras-apontamento.ts .................... sessão, período, conflito, dono
+    src/services/permissao.ts ................................ consultor da sessão nas rotas da API
+    src/components/session-guard.tsx ......................... aviso de sessão expirada (tela)
+    src/services/os/apoint.ts ................................ gravação do apontamento em tarefa
+    src/services/call/standby.ts ............................. gravação do StandBy
+    src/services/os/update.ts ................................ edição de OS
+    src/services/os/delete.ts ................................ exclusão de OS
+    src/services/tarefa/valid-hours.ts ....................... horas do mês (tarefa)
+    src/services/call/valid-hours.ts ......................... horas do mês (chamado)
+    src/services/call/change-status.ts ....................... regras de status

@@ -1,0 +1,49 @@
+[    3627ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js:38559
+[  270015ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[  270646ms] [ERROR] ./src/app/(private)/home/_components/ChamadosTable.tsx
+Error: 
+  x Unexpected token `table`. Expected jsx identifier
+    ,-[C:\Users\roger\Documentos\Solutii\Clientes\SOLUTII\Projetos\gerproj-solutii\src\app\(private)\home\_components\ChamadosTable.tsx:73:1]
+ 73 |     }
+ 74 | 
+ 75 |     return (
+ 76 |         <table className="w-full min-w-full border-collapse [&_th]:border-r [&_th]:border-white/20 [&_td]:border-r [&_td]:border-slate-200">
+    :          ^^^^^
+ 77 |             <thead>
+ 78 |                 {table.getHeaderGroups().map((headerGroup) => (
+ 79 |                     <tr key={headerGroup.id} className="text-cyan-50 bg-[#0f3d63] h-11 text-xs uppercase tracking-wide text-center">
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/(private)/home/_components/ChamadosTable.tsx
+./src/app/(private)/home/page.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/app-index.js:32
+[  283444ms] [ERROR] ./src/app/(private)/home/_components/ChamadosTable.tsx
+Error: 
+  x Unexpected token `table`. Expected jsx identifier
+    ,-[C:\Users\roger\Documentos\Solutii\Clientes\SOLUTII\Projetos\gerproj-solutii\src\app\(private)\home\_components\ChamadosTable.tsx:73:1]
+ 73 |     }
+ 74 | 
+ 75 |     return (
+ 76 |         <table className="w-full min-w-full border-collapse [&_th]:border-r [&_th]:border-white/20 [&_td]:border-r [&_td]:border-slate-200">
+    :          ^^^^^
+ 77 |             <thead>
+ 78 |                 {table.getHeaderGroups().map((headerGroup) => (
+ 79 |                     <tr key={headerGroup.id} className="text-cyan-50 bg-[#0f3d63] h-11 text-xs uppercase tracking-wide text-center">
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/(private)/home/_components/ChamadosTable.tsx
+./src/app/(private)/home/page.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/app-index.js:32
+[  284652ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[  284727ms] [LOG] [Fast Refresh] done in 75ms @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[  286885ms] [LOG] [Fast Refresh] done in 2233ms @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[  309381ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[  309714ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[  309737ms] [LOG] [Fast Refresh] done in 22ms @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[  313421ms] [LOG] [Fast Refresh] done in 3707ms @ webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43

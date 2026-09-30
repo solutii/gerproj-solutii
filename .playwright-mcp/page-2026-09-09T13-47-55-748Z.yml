@@ -1,0 +1,61 @@
+- generic [active] [ref=f26e1]:
+  - main [ref=f26e2]:
+    - generic [ref=f26e5]:
+      - generic [ref=f26e6]:
+        - heading "Solutii Sistemas" [level=1] [ref=f26e7]
+        - generic [ref=f26e8]: "|"
+        - paragraph [ref=f26e9]: ROGERIO JUNIO LOPES FERREIRA
+      - generic [ref=f26e10]:
+        - button "Área Atuação" [ref=f26e11] [cursor=pointer]
+        - button "Logout" [ref=f26e12] [cursor=pointer]
+    - generic [ref=f26e13]:
+      - generic [ref=f26e14]:
+        - button "Chamados" [ref=f26e15] [cursor=pointer]
+        - button "Tarefas / OS" [ref=f26e16] [cursor=pointer]
+      - table [ref=f26e19]:
+        - rowgroup [ref=f26e20]:
+          - row [ref=f26e21]:
+            - columnheader "Número" [ref=f26e22] [cursor=pointer]
+            - columnheader "Assunto" [ref=f26e23] [cursor=pointer]
+            - columnheader "E-mail" [ref=f26e24]
+            - columnheader "Data" [ref=f26e25] [cursor=pointer]
+            - columnheader "Status" [ref=f26e26] [cursor=pointer]
+            - columnheader "Ações" [ref=f26e27]
+            - columnheader "Arquivos" [ref=f26e28]
+        - rowgroup [ref=f26e36]:
+          - row [ref=f26e37] [cursor=pointer]:
+            - cell "15.102" [ref=f26e38]
+            - cell "[CLIENTE] Testando as alterações do fluxo5b" [ref=f26e39]
+            - cell "rogerio.jlf@gmail.com" [ref=f26e44]
+            - cell "08/09/2026 - 12:03" [ref=f26e45]
+            - cell "ATRIBUIDO" [ref=f26e46]
+            - cell [ref=f26e48]:
+              - img "EM ATENDIMENTO" [ref=f26e50]
+            - cell [ref=f26e54]:
+              - generic [ref=f26e55]:
+                - img "Upload" [ref=f26e58]
+                - link [ref=f26e61]:
+                  - /url: /api/arquivos?codChamado=15102
+          - row [ref=f26e64] [cursor=pointer]:
+            - cell "15.042" [ref=f26e65]
+            - cell "[DOX] Ajustes levantados na reuniao APP-DOX" [ref=f26e66]
+            - cell "cassio.ramalho@solutii.com.br" [ref=f26e71]
+            - cell "24/08/2026 - 15:30" [ref=f26e72]
+            - cell "ATRIBUIDO" [ref=f26e73]
+            - cell [ref=f26e75]:
+              - img "EM ATENDIMENTO" [ref=f26e77]
+            - cell [ref=f26e81]:
+              - generic [ref=f26e82]:
+                - img "Upload" [ref=f26e85]
+                - link [ref=f26e88]:
+                  - /url: /api/arquivos?codChamado=15042
+      - generic [ref=f26e30]:
+        - generic [ref=f26e31]:
+          - textbox [ref=f26e32]:
+            - /placeholder: Selecione uma data
+          - img [ref=f26e33] [cursor=pointer]
+        - generic [ref=f26e92]:
+          - text: "📋 Apontamentos do chamado:"
+          - generic [ref=f26e93]: "#15102"
+          - text: — CLIENTE TESTE
+  - alert [ref=f26e91]

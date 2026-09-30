@@ -1,0 +1,28 @@
+- main [ref=f32e2]:
+  - generic [ref=f32e5]:
+    - generic [ref=f32e6]:
+      - heading "Solutii Sistemas" [level=1] [ref=f32e7]
+      - generic [ref=f32e8]: "|"
+      - paragraph [ref=f32e9]: Usuário
+    - generic [ref=f32e10]:
+      - button "Área Atuação" [ref=f32e11] [cursor=pointer]
+      - button "Logout" [ref=f32e12] [cursor=pointer]
+  - generic [ref=f32e13]:
+    - generic [ref=f32e14]:
+      - button "Chamados" [ref=f32e15] [cursor=pointer]
+      - button "Tarefas / OS" [ref=f32e16] [cursor=pointer]
+    - table [ref=f32e19]:
+      - rowgroup [ref=f32e20]:
+        - row [ref=f32e21]:
+          - columnheader "Número" [ref=f32e22] [cursor=pointer]
+          - columnheader "Assunto" [ref=f32e27] [cursor=pointer]
+          - columnheader "E-mail" [ref=f32e32]
+          - columnheader "Data" [ref=f32e34] [cursor=pointer]
+          - columnheader "Status" [ref=f32e39] [cursor=pointer]
+          - columnheader "Ações" [ref=f32e44]
+          - columnheader "Arquivos" [ref=f32e45]
+      - rowgroup
+    - generic [ref=f32e48]:
+      - textbox [ref=f32e49]:
+        - /placeholder: Selecione uma data
+      - img [ref=f32e50] [cursor=pointer]

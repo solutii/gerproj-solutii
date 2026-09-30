@@ -1,0 +1,56 @@
+- generic [active] [ref=f33e1]:
+  - main [ref=f33e2]:
+    - generic [ref=f33e5]:
+      - generic [ref=f33e6]:
+        - heading "Solutii Sistemas" [level=1] [ref=f33e7]
+        - generic [ref=f33e8]: "|"
+        - paragraph [ref=f33e9]: ROGERIO JUNIO LOPES FERREIRA
+      - generic [ref=f33e10]:
+        - button "Área Atuação" [ref=f33e11] [cursor=pointer]
+        - button "Logout" [ref=f33e12] [cursor=pointer]
+    - generic [ref=f33e13]:
+      - generic [ref=f33e14]:
+        - button "Chamados" [ref=f33e15] [cursor=pointer]
+        - button "Tarefas / OS" [ref=f33e16] [cursor=pointer]
+      - table [ref=f33e19]:
+        - rowgroup [ref=f33e20]:
+          - row [ref=f33e21]:
+            - columnheader "Número" [ref=f33e22] [cursor=pointer]
+            - columnheader "Assunto" [ref=f33e27] [cursor=pointer]
+            - columnheader "E-mail" [ref=f33e32]
+            - columnheader "Data" [ref=f33e34] [cursor=pointer]
+            - columnheader "Status" [ref=f33e39] [cursor=pointer]
+            - columnheader "Ações" [ref=f33e44]
+            - columnheader "Arquivos" [ref=f33e45]
+        - rowgroup [ref=f33e53]:
+          - row [ref=f33e54] [cursor=pointer]:
+            - cell "15.102" [ref=f33e55]
+            - cell "[CLIENTE] Testando as alterações do fluxo5b" [ref=f33e56]
+            - cell "rogerio.jlf@gmail.com" [ref=f33e61]
+            - cell "08/09/2026 - 12:03" [ref=f33e62]
+            - cell "ATRIBUIDO" [ref=f33e63]
+            - cell [ref=f33e65]:
+              - img "EM ATENDIMENTO" [ref=f33e67]
+            - cell [ref=f33e71]:
+              - generic [ref=f33e72]:
+                - img "Upload" [ref=f33e75]
+                - link [ref=f33e78]:
+                  - /url: /api/arquivos?codChamado=15102
+          - row [ref=f33e81] [cursor=pointer]:
+            - cell "15.042" [ref=f33e82]
+            - cell "[DOX] Ajustes levantados na reuniao APP-DOX" [ref=f33e83]
+            - cell "cassio.ramalho@solutii.com.br" [ref=f33e88]
+            - cell "24/08/2026 - 15:30" [ref=f33e89]
+            - cell "ATRIBUIDO" [ref=f33e90]
+            - cell [ref=f33e92]:
+              - img "EM ATENDIMENTO" [ref=f33e94]
+            - cell [ref=f33e98]:
+              - generic [ref=f33e99]:
+                - img "Upload" [ref=f33e102]
+                - link [ref=f33e105]:
+                  - /url: /api/arquivos?codChamado=15042
+      - generic [ref=f33e48]:
+        - textbox [ref=f33e49]:
+          - /placeholder: Selecione uma data
+        - img [ref=f33e50] [cursor=pointer]
+  - alert [ref=f33e108]
