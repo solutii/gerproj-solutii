@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useHomeStore } from "@/stores/home-store";
+import { chaves } from "@/hooks/queries/chaves";
+import { getQueryClient } from "@/lib/query-client";
 import { ChamadosType } from "@/types/chamados";
 import { TaskType } from "@/types/tarefa";
 import {
@@ -78,11 +80,10 @@ describe("changeSelectedCall", () => {
         const chamado = makeChamado();
         changeSelectedCall(chamado);
 
-        useHomeStore.getState().setListOs([{ COD_OS: 1 }]);
         changeSelectedCall(chamado);
 
+        // a lista de OS deriva da seleção (useOsLista): sem seleção, nenhuma lista
         expect(useHomeStore.getState().selectedCall).toBeNull();
-        expect(useHomeStore.getState().listOs).toEqual([]);
     });
 
     it("troca de um chamado para outro normalmente (sem toggle off)", () => {
@@ -111,11 +112,9 @@ describe("changeSelectedCallTrf", () => {
         const task = makeTask();
         changeSelectedCallTrf(task);
 
-        useHomeStore.getState().setListOs([{ COD_OS: 1 }]);
         changeSelectedCallTrf(task);
 
         expect(useHomeStore.getState().selectedProj).toBeNull();
-        expect(useHomeStore.getState().listOs).toEqual([]);
     });
 });
 
@@ -230,11 +229,16 @@ describe("validCurrentDate", () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-09-10T12:00:00"));
-        useHomeStore.getState().setLimitDate(new Date("2026-09-01T00:00:00"));
+        // período de apontamento já carregado no cache do Query (usePeriodoApontamento)
+        getQueryClient().setQueryData(chaves.periodo(1), {
+            PERMAPO_RECURSO: "SIM",
+            DTLIMITE_RECURSO: "2026-09-01T00:00:00",
+        });
     });
 
     afterEach(() => {
         vi.useRealTimers();
+        getQueryClient().clear();
     });
 
     it("aceita uma data dentro do período vigente", () => {

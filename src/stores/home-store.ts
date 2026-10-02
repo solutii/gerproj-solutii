@@ -3,6 +3,10 @@ import { agoraNoFuso } from "@/utils/horario-futuro";
 import { ChamadosType } from "@/types/chamados";
 import { TaskType } from "@/types/tarefa";
 
+// Só estado de TELA (seleção, modais, campos do formulário, aba). Dados que vêm
+// do servidor -- chamados, tarefas, lista de OS, período de apontamento --
+// ficam no TanStack Query (src/hooks/queries), nunca aqui.
+//
 // Estado da tela /home, antes espalhado em ~31 useState dentro do
 // componente. Migrado 1:1 (mesmos nomes, mesmo formato de setter) para uma
 // store única -- é o primeiro passo antes de quebrar a tela em componentes
@@ -22,14 +26,8 @@ function resolveUpdater<T>(updater: Updater<T>, prev: T): T {
 type Hours = { initial: string; final: string };
 
 interface HomeState {
-    calls: ChamadosType[];
-    setCalls: (calls: ChamadosType[]) => void;
-
-    tab: "chamado" | "os";
-    setTab: (tab: "chamado" | "os") => void;
-
-    projes: TaskType[];
-    setProjes: (projes: TaskType[]) => void;
+    tab: "chamado" | "os" | "painel";
+    setTab: (tab: "chamado" | "os" | "painel") => void;
 
     isOpenModal: boolean;
     setOpenModal: (open: boolean) => void;
@@ -73,15 +71,6 @@ interface HomeState {
     isProcessing: boolean;
     setIsProcessing: (processing: boolean) => void;
 
-    loadingOs: boolean;
-    setLoadingOs: (loading: boolean) => void;
-
-    loadingTables: boolean;
-    setLoadingTables: (loading: boolean) => void;
-
-    listOs: any[];
-    setListOs: (list: any[]) => void;
-
     hours: Hours;
     setHours: (updater: Updater<Hours>) => void;
 
@@ -112,28 +101,22 @@ interface HomeState {
     date: string;
     setDate: (date: string) => void;
 
+    // Data (e horário) escolhidos no Meu Painel para um apontamento: o painel já
+    // preenche `date`/`hours`; este campo só mantém o aviso na tela até o
+    // consultor concluir ou cancelar.
+    apontamentoSugerido: { data: string; inicio: string; fim: string } | null;
+    setApontamentoSugerido: (sugerido: { data: string; inicio: string; fim: string } | null) => void;
+
     directionOrder: "asc" | "desc";
     setDirectionOrder: (direction: "asc" | "desc") => void;
 
     selectedDate: string;
     setSelectedDate: (date: string) => void;
-
-    limitDate: Date | undefined;
-    setLimitDate: (date: Date | undefined) => void;
-
-    tomorrow: Date | undefined;
-    setTomorrow: (date: Date | undefined) => void;
 }
 
 export const useHomeStore = create<HomeState>((set) => ({
-    calls: [],
-    setCalls: (calls) => set({ calls }),
-
     tab: "chamado",
     setTab: (tab) => set({ tab }),
-
-    projes: [],
-    setProjes: (projes) => set({ projes }),
 
     isOpenModal: false,
     setOpenModal: (isOpenModal) => set({ isOpenModal }),
@@ -179,15 +162,6 @@ export const useHomeStore = create<HomeState>((set) => ({
     isProcessing: false,
     setIsProcessing: (isProcessing) => set({ isProcessing }),
 
-    loadingOs: false,
-    setLoadingOs: (loadingOs) => set({ loadingOs }),
-
-    loadingTables: true,
-    setLoadingTables: (loadingTables) => set({ loadingTables }),
-
-    listOs: [],
-    setListOs: (listOs) => set({ listOs }),
-
     hours: { initial: "", final: "" },
     setHours: (updater) => set((state) => ({ hours: resolveUpdater(updater, state.hours) })),
 
@@ -215,15 +189,12 @@ export const useHomeStore = create<HomeState>((set) => ({
     date: agoraNoFuso().data,
     setDate: (date) => set({ date }),
 
+    apontamentoSugerido: null,
+    setApontamentoSugerido: (apontamentoSugerido) => set({ apontamentoSugerido }),
+
     directionOrder: "desc",
     setDirectionOrder: (directionOrder) => set({ directionOrder }),
 
     selectedDate: "",
     setSelectedDate: (selectedDate) => set({ selectedDate }),
-
-    limitDate: undefined,
-    setLimitDate: (limitDate) => set({ limitDate }),
-
-    tomorrow: undefined,
-    setTomorrow: (tomorrow) => set({ tomorrow }),
 }));

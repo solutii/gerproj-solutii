@@ -1,10 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import DateInput from "@/components/date-input";
 import { useHomeStore } from "@/stores/home-store";
+import { useHorariosOcupados, usePeriodoApontamento } from "@/hooks/queries/leituras";
+import {
+  horaFinalIndisponivel,
+  horaInicialOcupada,
+  textoDoConflito,
+} from "@/utils/horarios-ocupados";
 import { formatSentenceCase } from "@/utils/formatters";
 import { agoraNoFuso } from "@/utils/horario-futuro";
 import { DESCRICAO_MINIMA } from "@/utils/descricao-apontamento";
+import { lerRascunho, salvarRascunho } from "@/utils/rascunho";
 
 // Horários disponíveis nos selects -- de meia em meia hora (00:00 a 23:30).
 const HORARIOS = Array.from({ length: 48 }, (_, i) => {
@@ -31,13 +39,16 @@ type Props = {
   // Editar OS não trava a data por período vigente (comportamento original);
   // Standby e Apontamento sim.
   limitarData?: boolean;
+  // Identifica o rascunho da descrição (ex.: "tarefa:1771"). Sem chave, não há rascunho
+  // (Editar OS já parte do texto gravado).
+  rascunhoChave?: string;
 };
 
 // Campos compartilhados pelos modais de Standby, Editar apontamento e
 // Apontamento: descrição, horas (início/fim) e data. Lê e escreve direto na
 // store -- os 3 modais reaproveitam os mesmos campos (description/hours/date)
 // no componente original, então mantemos esse mesmo compartilhamento aqui.
-export default function CamposApontamento({ limitarData }: Props) {
+export default function CamposApontamento({ limitarData, rascunhoChave }: Props) {
   const {
     description,
     setDescription,
@@ -45,8 +56,27 @@ export default function CamposApontamento({ limitarData }: Props) {
     setHours,
     date,
     setDate,
-    limitDate,
   } = useHomeStore();
+  const { limitDate } = usePeriodoApontamento();
+  // Horários já usados por outras OS nesta data (mesma regra do servidor).
+  const { ocupados, conflito } = useHorariosOcupados(true);
+
+  // Rascunho: ao abrir, se a descrição está vazia e há texto guardado de uma
+  // abertura anterior (modal fechado sem gravar), ele volta para o campo.
+  const [rascunhoRecuperado, setRascunhoRecuperado] = useState(false);
+
+  useEffect(() => {
+    if (!rascunhoChave || useHomeStore.getState().description !== "") return;
+
+    const guardado = lerRascunho(rascunhoChave);
+
+    if (guardado) {
+      setDescription(guardado);
+      setRascunhoRecuperado(true);
+    }
+    // só na abertura do modal
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rascunhoChave]);
 
   // Hoje só dá pra apontar até o horário atual (Brasília); outros dias, livre.
   const agora = agoraNoFuso();
@@ -87,10 +117,19 @@ export default function CamposApontamento({ limitarData }: Props) {
           autoFocus
           className={`${inputClass} resize-none`}
           value={description}
-          onChange={(event) =>
-            setDescription(formatSentenceCase(event.target.value))
-          }
+          onChange={(event) => {
+            const texto = formatSentenceCase(event.target.value);
+
+            setDescription(texto);
+            setRascunhoRecuperado(false);
+            if (rascunhoChave) salvarRascunho(rascunhoChave, texto);
+          }}
         />
+        {rascunhoRecuperado && (
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-300">
+            Rascunho recuperado da última vez que você abriu esta janela.
+          </p>
+        )}
         <p
           className={`text-sm font-medium text-right ${
             description.trim().length >= DESCRICAO_MINIMA
@@ -123,11 +162,17 @@ export default function CamposApontamento({ limitarData }: Props) {
             }
           >
             <option value="">Selecione</option>
-            {opcoesHorario(hours.initial, { max: limiteHora }).map((hr) => (
-              <option key={hr} value={hr}>
-                {hr}
-              </option>
-            ))}
+            {opcoesHorario(hours.initial, { max: limiteHora }).map((hr) => {
+              // o horário já escolhido nunca é bloqueado (o aviso de conflito cuida dele)
+              const ocupado = hr !== hours.initial && horaInicialOcupada(hr, ocupados);
+
+              return (
+                <option key={hr} value={hr} disabled={ocupado}>
+                  {hr}
+                  {ocupado ? " (ocupado)" : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -147,11 +192,17 @@ export default function CamposApontamento({ limitarData }: Props) {
             {opcoesHorario(hours.final, {
               max: limiteHora,
               depoisDe: hours.initial,
-            }).map((hr) => (
-              <option key={hr} value={hr}>
-                {hr}
-              </option>
-            ))}
+            }).map((hr) => {
+              const indisponivel =
+                hr !== hours.final && horaFinalIndisponivel(hr, hours.initial, ocupados);
+
+              return (
+                <option key={hr} value={hr} disabled={indisponivel}>
+                  {hr}
+                  {indisponivel ? " (ocupado)" : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -173,6 +224,12 @@ export default function CamposApontamento({ limitarData }: Props) {
           />
         </div>
       </div>
+
+      {conflito && (
+        <p role="alert" className="text-sm font-medium text-red-500">
+          {textoDoConflito(conflito)}
+        </p>
+      )}
     </div>
   );
 }

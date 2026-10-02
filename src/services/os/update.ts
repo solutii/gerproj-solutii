@@ -1,8 +1,7 @@
-import { ChamadosType, STATUS_CHAMADO, STATUS_CHAMADO_COD } from "@/types/chamados";
-import { Firebird, getConnection } from "../firebird";
+import { gravarEmSerie } from "../transacao";
 import iconv from "iconv-lite"
 import { ErroDeRegra } from "../erro-regra"
-import { validarApontamento, validarPosseOs } from "./regras-apontamento"
+import { conferirConflitoNaTransacao, validarApontamento, validarPosseOs } from "./regras-apontamento"
 import ValidHoursChamado from "../call/valid-hours"
 import ValidHoursTarefa from "../tarefa/valid-hours"
 import {
@@ -24,8 +23,6 @@ export default async function UpdateOsService(
 
 
     return new Promise(async (resolve, reject) => {
-
-        let db: any = null
 
         try {
 
@@ -61,71 +58,27 @@ export default async function UpdateOsService(
                 }
             }
 
-            db = await new Promise((resolve, reject) => {
-                getConnection( (err: any, db: any) => {
-                    if (err) {
-                        return reject(err)
-                    }
-                    return resolve(db)
-                })
-            })
+            // Dentro da transação, logo antes do UPDATE: ninguém ocupou o horário
+            // nesse meio-tempo (a própria OS fica de fora).
+            await gravarEmSerie(async (tx) => {
+                await conferirConflitoNaTransacao(tx, { recurso, date, startTime, endTime, ignorarCodOs: codOs })
 
-            
-   
-            const transaction: any = await new Promise((resolve, reject) => {
-                db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
-                    if (err) {
-                        db?.detach()
-                        return reject(err)
-                    }
-                    return resolve(transaction)
-                })
-            })
-            
-            let success = await new Promise((resolve, reject) => {
-                transaction.query(
-                `UPDATE OS  SET DTINI_OS= ?, HRINI_OS= ?, HRFIM_OS= ?, OBS= ? WHERE COD_OS = ?`,
+                await tx.executar(
+                    `UPDATE OS  SET DTINI_OS= ?, HRINI_OS= ?, HRFIM_OS= ?, OBS= ? WHERE COD_OS = ?`,
                     [
                         new Date(`${date} 00:00`).toLocaleString('pt-br', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replaceAll('/', '.').replaceAll(',', ''),
                         startTime.replace(":", ""),
                         endTime.replace(":", ""),
                         iconv.encode( description, 'WIN1252'),
                         codOs
-                    ], async function (err: any, result: any) {
-
-                        if (err) {
-                            
-                            transaction.rollback();
-                            db?.detach()
-                            return reject(err)
-                        }
-
-                        return resolve(true)
-
-                        
-                    });
+                    ])
             })
 
-            success = await transaction.commit((err: Error) => {
-                if (err) {
-                    console.log(err)
-                    transaction.rollback();
-                    return reject(err)
-                }
-                else {
-                    db?.detach();
-                    return resolve(true)
-                }
-
-            });
-
-            db?.detach()
+            // só chega aqui com o commit terminado
             resolve(true)
-
 
         } catch (err) {
             console.log(err)
-            db?.detach();
             return reject(err)
         }
     })

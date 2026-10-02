@@ -4,6 +4,8 @@ import NextAuth from 'next-auth';
     user: {
      recurso: string,
      id: string;
+     // "ADM" (administrador) ou "USU" (consultor)
+     tipo?: string;
       } & DefaultSession['user'];
      }
     }

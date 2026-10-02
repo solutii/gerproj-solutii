@@ -18,6 +18,9 @@ arquivo travas-de-apontamento.txt (regras de negócio do apontamento).
     - Anexos: código do chamado só com dígitos (evita "../") + chamado do
       consultor; limite de 25 MB por arquivo; a resposta não mostra o caminho
       da pasta do servidor.
+    - /api/painel (Meu Painel, ver docs/painel-consultor.txt): só leitura; o
+      consultor vem da sessão e o parâmetro "mes" é validado (AAAA-MM, até o
+      mês atual).
 
 1.2 Rotas que alteram dados só aceitam POST
     change-status, start, standby, apoint, update e delete não respondem mais
@@ -71,11 +74,54 @@ arquivo travas-de-apontamento.txt (regras de negócio do apontamento).
 
 1.9 NEXTAUTH_SECRET forte
     Trocado por um segredo aleatório de 64 caracteres (antes: 29). Ele assina e
-    criptografa o cookie de sessão. No SERVIDOR só vale depois de o .env novo
-    ser copiado e o sistema reiniciado; nesse momento todos os usuários são
-    deslogados uma vez (o cookie antigo não abre mais). Para trocar de novo:
+    criptografa o cookie de sessão. No SERVIDOR só vale depois de a linha
+    NEXTAUTH_SECRET do .env do servidor ser trocada pelo valor novo e o sistema
+    reiniciado; nesse momento todos os usuários são deslogados uma vez (o cookie
+    antigo não abre mais). ATENÇÃO: NÃO copie o .env inteiro da máquina de
+    desenvolvimento para o servidor: o .env daqui aponta para o banco LOCAL
+    (FIREBIRD_HOST=localhost, C:\GERPROJ-Local\...) e o do servidor precisa ter
+    o bloco de PRODUÇÃO. Edite só a linha do segredo. Para trocar de novo:
     gerar com "openssl rand -base64 48" ou "node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
     e nunca colocar o valor em chat, e-mail ou git.
+
+
+1.10 Next.js 15
+    next 14.2.35 -> 15.5.25 e react 18 -> 19 (corrige as vulnerabilidades críticas
+    e altas do Next). Detalhes, testes feitos, passos de deploy e rollback em
+    docs/upgrade-next15.txt. No servidor é OBRIGATÓRIO reinstalar as dependências
+    (pnpm install --frozen-lockfile --prod) antes de subir o .next novo.
+
+
+1.11 Política de conteúdo (CSP) e dados no navegador
+    next.config.mjs envia o cabeçalho Content-Security-Policy: a página só carrega
+    script, estilo, imagem, fonte e conexão do próprio sistema; formulários só
+    enviam para o próprio sistema; não pode ser embutida em iframe de outro site;
+    plugins (object) bloqueados. Conferido em produção (cópia do build): o sistema
+    inteiro funciona (home, painel e gráficos, modais, exportação do espelho,
+    áreas de atuação) e conexão/script externos são bloqueados.
+    Limite conhecido: o script continua com 'unsafe-inline' (o Next injeta scripts
+    inline e o layout tem o script do tema escuro). Fechar isso exige nonce por
+    requisição, o que desliga a renderização estática das páginas: fica como
+    melhoria futura. 'unsafe-eval' só existe em desenvolvimento.
+    O cabeçalho NÃO inclui upgrade-insecure-requests nem HSTS, de propósito: o
+    sistema ainda roda em HTTP (ver 2.1).
+    No navegador, o cache de dados (TanStack Query) e os rascunhos de descrição
+    são limpos no logout e quando a sessão expira (ver docs/tanstack-query.txt).
+    O limite de tentativas de login (1.5) já existia e continua valendo.
+
+
+1.12 Painel de administração e perfis (ADM / USU)
+    O administrador só enxerga /admin e o consultor não entra lá; o bloqueio é do
+    servidor (middleware + conferência do tipo NO BANCO a cada chamada de
+    /api/admin). O ADM não consegue usar as rotas de apontamento do consultor.
+    Alterações do painel passam por validação rígida (só 6 campos, valores
+    checados), exigem JSON, são feitas em transação e ficam registradas em arquivo
+    com corrente de hash (falha-fechada: sem registro, nada muda). Detalhes e
+    operação em docs/painel-admin.txt.
+    O dashboard do administrador (aba Dashboard) também é só do ADM, somente leitura
+    (apenas SELECT), com mês validado e código de consultor conferido no cadastro; os
+    textos que vêm do banco são escapados na exportação (HTML) e neutralizados contra
+    fórmula do Excel (CSV).
 
 
 2. PENDENTE (precisa de decisão ou de infraestrutura)
@@ -87,16 +133,11 @@ arquivo travas-de-apontamento.txt (regras de negócio do apontamento).
     Secure. Solução: proxy reverso com certificado (Caddy, nginx, IIS,
     Cloudflare...). Depois disso, definir NEXTAUTH_URL com https://.
 
-2.2 Next.js 14 -> 15
-    O Next 14.2.x tem vulnerabilidades críticas/altas só corrigidas na 15.5.21
-    ou mais (troca de versão maior). O dashboard já usa o Next 15. Fazer como
-    projeto separado, com testes e build.
-
-2.3 Senhas dos usuários (sistema legado em Delphi)
+2.2 Senhas dos usuários (sistema legado em Delphi)
     Guardadas com XOR de chave fixa (reversível) e comparadas sem diferenciar
     maiúscula de minúscula. Só dá para corrigir junto com o Delphi. O limite
     de tentativas (1.5) reduz o risco enquanto isso.
 
-2.4 puppeteer (usado só em src/nfe)
+2.3 puppeteer (usado só em src/nfe)
     Traz várias dependências com vulnerabilidades (ws, ip-address, extract-zip).
     Se o módulo NFC-e não for usado neste projeto, remover do package.json.

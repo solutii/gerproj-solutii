@@ -1,0 +1,82 @@
+ATUALIZAÇÃO PARA NEXT.JS 15 - gerproj-solutii
+===============================================
+
+Data: 30/09/2026
+
+O QUE MUDOU
+-----------
+  next ................ 14.2.35  ->  15.5.25   (corrige as falhas críticas/altas)
+  react / react-dom ... 18.3.1  ->  19.1.9     (o Next 15 usa React 19 no App Router)
+  @types/react(-dom) .. 18      ->  19
+  eslint-config-next .. 14.2.3  ->  15.5.25
+
+  Arquivos alterados: package.json, pnpm-lock.yaml e next.config.mjs (removida a
+  opção experimental.instrumentationHook, que não é mais necessária no Next 15).
+  Nenhum código da aplicação (src/) precisou mudar: o compilador do TypeScript,
+  o lint e os testes passaram sem ajustes.
+
+  Não foram mexidos: HTTPS (infraestrutura) e puppeteer.
+
+
+COMO FOI VERIFICADO (tudo local, sem gravar dados)
+--------------------------------------------------
+  - tsc (tipos), lint e 153 testes automatizados: passam.
+  - Build de produção (next build): concluído, sem erros.
+  - Servidor de produção (next start) subiu; o aquecimento do pool do banco no
+    boot ("[FIREBIRD] Pool de conexões aquecido") continua funcionando sem a flag.
+  - Login real do next-auth: 5 tentativas falhas e a 6ª bloqueada (LOGIN_BLOQUEADO).
+  - Rotas da API: 401 sem sessão; 405 em GET nas rotas que só aceitam POST.
+  - Navegador automatizado (Playwright) com sessão de teste, só leitura:
+      * /home carrega com os dados reais (chamados, OS, filtros, ícones);
+      * modal de StandBy abre, valida (contador 50 caracteres, selects de hora,
+        botão Confirmar só habilita quando válido), funciona em modo claro e
+        escuro e fecha no Cancelar (nenhuma gravação foi confirmada);
+      * aba Tarefas carrega;
+      * sessão expirada mostra o aviso e leva ao /login;
+      * zero erros/avisos no console do navegador.
+  - Modo desenvolvimento (next dev) sobe normalmente.
+  - Auditoria: Next.js e next-auth sem vulnerabilidades; críticas 2 -> 0 e altas
+    27 -> 12 (as restantes são dependências indiretas, como postcss, js-yaml,
+    brace-expansion e o extract-zip do puppeteer).
+
+
+COMO SUBIR NO SERVIDOR  (ATENÇÃO: desta vez o passo 2 é obrigatório)
+--------------------------------------------------------------------
+  Na máquina de desenvolvimento:
+    1. pnpm build        (se aparecer "next dev" rodando, feche antes)
+
+  No servidor (C:\GERPROJ\web-app-2):
+    2. Feche a janela do next-server.
+    3. Copie package.json e pnpm-lock.yaml (os DOIS) e rode, na pasta do app:
+           pnpm install --frozen-lockfile --prod
+       O .next novo foi gerado com o Next 15: rodá-lo com o node_modules antigo
+       (Next 14) quebra. NUNCA copie a pasta node_modules.
+    4. Apague a pasta .next antiga e cole a nova.
+    5. Abra o execGerProj.bat. Deve aparecer "Next.js 15.5.25", "Ready" e
+       "Local: http://localhost:3000".
+    6. Abra o sistema, faça login e confira: lista de chamados, um apontamento
+       de teste e o download de um anexo.
+
+  Desde 02/10/2026 há também duas dependências novas: @tanstack/charts (gráficos
+  do Meu Painel) e @tanstack/react-query (busca e cache de dados, ver
+  docs/tanstack-query.txt). O package.json/pnpm-lock.yaml as incluem, então o
+  passo 3 já cobre.
+
+  O servidor tem Node 24 (o Next 15 exige Node 18.18 ou mais).
+
+
+COMO VOLTAR ATRÁS (ROLLBACK)
+----------------------------
+  Existe um backup completo do projeto, de ANTES desta atualização, na pasta
+  irmã:  gerproj-solutii-backup-next14   (sem node_modules e sem .next).
+
+  Para voltar ao Next 14 (na máquina de desenvolvimento e depois no servidor):
+    1. Copie para gerproj-solutii estes 3 arquivos da pasta de backup:
+           package.json, pnpm-lock.yaml, next.config.mjs
+    2. pnpm install
+    3. pnpm build   (e, no servidor, repita os passos de subir acima)
+
+  Observação: o backup também tem o restante do projeto como estava (inclusive
+  o .env), então ele serve de ponto de restauração para qualquer arquivo.
+  Depois que o Next 15 estiver estável em produção, a pasta de backup pode ser
+  apagada.

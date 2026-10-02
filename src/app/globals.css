@@ -26,6 +26,42 @@
       0 6px 14px -6px rgba(0, 0, 0, 0.4);
   }
 
+  /* Relevo de BADGE (selo informativo, não clicável): um leve brilho no alto, uma sombra curta
+     embaixo e um degradê de luz. Propositalmente mais discreto que o .depth-btn (sem borda
+     interna escura, sem anel e sem brilho ciano), para não parecer um botão. */
+  .depth-badge {
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 1px 2px rgba(0, 0, 0, 0.22),
+      0 5px 10px -5px rgba(0, 0, 0, 0.35);
+  }
+
+  .dark .depth-badge {
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 60%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 1px 2px rgba(0, 0, 0, 0.5),
+      0 5px 10px -5px rgba(0, 0, 0, 0.7);
+  }
+
+  /* Relevo do NÚMERO dentro do badge: AFUNDADO (como um visor embutido). O badge é saliente
+     (.depth-badge: luz em cima, sombra embaixo); o número é o inverso: sombra por dentro no alto
+     e um fio de luz embaixo, o que o faz parecer um recorte no badge. */
+  .depth-contador {
+    background-color: rgba(0, 0, 0, 0.24);
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.4),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.22);
+  }
+
+  .dark .depth-contador {
+    background-color: rgba(0, 0, 0, 0.34);
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.6),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.14);
+  }
+
   /* Modo escuro: sombra preta some no fundo escuro, então o destaque vem de
      luz -- brilho claro nos ícones e contorno + brilho ciano nos botões. */
   .dark .depth-icon {
@@ -41,5 +77,29 @@
       0 0 0 1px rgba(255, 255, 255, 0.14),
       0 0 14px -2px rgba(103, 232, 249, 0.35),
       0 6px 14px -4px rgba(0, 0, 0, 0.9);
+  }
+}
+
+/* Troca de página das listas do dashboard: as linhas novas entram deslizando
+   (de fora para dentro, no sentido em que o usuário está andando). */
+@keyframes slide-proxima {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-anterior {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }

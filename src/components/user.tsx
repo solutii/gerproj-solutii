@@ -5,46 +5,19 @@ import { useSession } from "next-auth/react";
 import { useThemeStore } from "@/stores/theme-store";
 import { TbMoon, TbSun, TbX, TbDoorExit } from "react-icons/tb";
 import Tooltip from "@/components/tooltip";
+import { useAreas } from "@/hooks/queries/leituras";
+import { useSalvarAreas } from "@/hooks/queries/mutacoes";
+import { mensagemDoErro } from "@/lib/api";
+import type { Area } from "@/lib/api-home";
+import { limparCacheDoUsuario } from "@/lib/query-client";
+import { limparTodosRascunhos } from "@/utils/rascunho";
 
 type UserProps = {
   signOut: () => void;
   onSave?: (areas: string[]) => void;
+  // Painel do administrador: sem o botão "Área Atuação" (é do consultor e usa rotas dele)
+  semAreas?: boolean;
 };
-
-type Area = {
-  COD_AREA: number;
-  NOME_AREA: string;
-  ATIVO_AREA: string;
-  CHAMADO_AREA: string;
-  OBS_RECAREA?: string; // existing note: optional text (will be edited)
-  SELECTED?: string; // '0' or '1'
-};
-
-type RecAreaPayload = {
-  COD_RECURSO: string | number;
-  COD_AREA: number;
-  OBS_RECAREA: string;
-};
-
-/**
- * Post an array of { COD_RECURSO, COD_AREA, OBS_RECAREA } to /api/recarea
- */
-export async function postRecAreas(
-  codRecurso: string | number,
-  items: Array<{ COD_AREA: number; OBS_RECAREA?: string }>,
-): Promise<Response> {
-  const payload: RecAreaPayload[] = items.map((it) => ({
-    COD_RECURSO: codRecurso,
-    COD_AREA: it.COD_AREA,
-    OBS_RECAREA: (it.OBS_RECAREA ?? "").slice(0, 250),
-  }));
-
-  return fetch("/api/recarea", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-}
 
 /**
  * Hook to manage OBS_RECAREA state per area (max 250 chars).
@@ -85,15 +58,15 @@ export function useObsMap(initialAreas: Area[] = []) {
   return { obsMap, setObs, ensureFromAreas };
 }
 
-export default function UserComponent({ signOut, onSave }: UserProps) {
+export default function UserComponent({ signOut, onSave, semAreas = false }: UserProps) {
   const [openSettings, setOpenSettings] = useState(false);
-  const [availableAreas, setAvailableAreas] = useState<Area[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
-  const [loadingAreas, setLoadingAreas] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   function handleSignOut() {
     setIsLoggingOut(true);
+    limparCacheDoUsuario(); // nada do usuário atual pode sobrar no cache
+    limparTodosRascunhos();
     signOut();
   }
 
@@ -107,46 +80,23 @@ export default function UserComponent({ signOut, onSave }: UserProps) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  // load available areas from API and initialize selected from SELECTED field
+  // Áreas disponíveis (Query): buscadas ao abrir as configurações e mantidas em
+  // cache; só mudam depois de salvar. O formulário edita uma cópia local.
+  const areasQuery = useAreas(openSettings);
+  const availableAreas: Area[] = areasQuery.data ?? [];
+  const loadingAreas = areasQuery.isLoading;
+  const salvarAreasMutation = useSalvarAreas();
+
+  // Ao abrir (ou quando as áreas chegam/são salvas), a cópia local volta ao
+  // que está cadastrado -- marcações não salvas de uma abertura anterior são descartadas.
   useEffect(() => {
-    if (!openSettings) return;
-    let mounted = true;
-    setLoadingAreas(true);
+    if (!openSettings || !areasQuery.data) return;
 
-    fetch("/api/area", {
-      method: "POST",
-      body: JSON.stringify({
-        COD_RECURSO: session?.user?.recurso,
-      }),
-    })
-      .then((res) => res.json())
-      .then((data: Area[]) => {
-        if (!mounted) return;
-        const areas = Array.isArray(data) ? data : [];
-        setAvailableAreas(areas);
-        // initialize selectedAreas from SELECTED === '1'
-        const initiallySelected = areas
-          .filter((a) => a.SELECTED === "1")
-          .map((a) => a.NOME_AREA);
-        setSelectedAreas(initiallySelected);
-
-        // populate obsMap from fetched areas' OBS_RECAREA
-        ensureFromAreas(areas);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setAvailableAreas([]);
-        setSelectedAreas([]);
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setLoadingAreas(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [openSettings, session?.user?.recurso, ensureFromAreas]);
+    const areas = areasQuery.data;
+    setSelectedAreas(areas.filter((a) => a.SELECTED === "1").map((a) => a.NOME_AREA));
+    // populate obsMap from fetched areas' OBS_RECAREA
+    ensureFromAreas(areas);
+  }, [openSettings, areasQuery.data, ensureFromAreas]);
 
   const toggleArea = (name: string) => {
     setSelectedAreas((prev) =>
@@ -168,29 +118,27 @@ export default function UserComponent({ signOut, onSave }: UserProps) {
     try {
       setSaving(true);
       setSaveMessage("Enviando...");
-      const res = await postRecAreas(session?.user?.recurso ?? "", items);
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Erro ao salvar áreas:", text);
-        setSaveMessage(
-          `Não foi possível salvar as áreas de atuação (erro ${res.status} do servidor). Tente novamente.`,
-        );
-        // mantém botão habilitado para tentar novamente
+      await salvarAreasMutation.mutateAsync(
+        items.map((it) => ({
+          COD_RECURSO: session?.user?.recurso ?? "",
+          COD_AREA: it.COD_AREA,
+          OBS_RECAREA: (it.OBS_RECAREA ?? "").slice(0, 250),
+        })),
+      );
+
+      setSaveMessage("Áreas de atuação salvas com sucesso!");
+      onSave?.(selectedAreas);
+      // fecha modal após breve delay para usuário ver a mensagem
+      setTimeout(() => {
+        setOpenSettings(false);
         setSaving(false);
-      } else {
-        setSaveMessage("Áreas de atuação salvas com sucesso!");
-        onSave?.(selectedAreas);
-        // fecha modal após breve delay para usuário ver a mensagem
-        setTimeout(() => {
-          setOpenSettings(false);
-          setSaving(false);
-          setSaveMessage(null);
-        }, 700);
-      }
+        setSaveMessage(null);
+      }, 700);
     } catch (err) {
-      console.error("Erro ao chamar API de recarea:", err);
+      console.error("Erro ao salvar as áreas de atuação:", err);
+      // mantém botão habilitado para tentar novamente
       setSaveMessage(
-        "Não foi possível conectar ao servidor para salvar as áreas de atuação. Verifique sua conexão.",
+        mensagemDoErro(err, "Não foi possível salvar as áreas de atuação. Tente novamente."),
       );
       setSaving(false);
     }
@@ -283,13 +231,15 @@ export default function UserComponent({ signOut, onSave }: UserProps) {
               </span>
             </button>
           </Tooltip>
-          <button
-            className="px-3 py-1.5 text-sm font-medium text-white bg-white/10 border border-white/10 rounded-lg depth-btn transition-all duration-150 hover:bg-white/20 hover:border-white/30 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f3d63]"
-            onClick={() => setOpenSettings(true)}
-            aria-label="Área Atuação"
-          >
-            Área Atuação
-          </button>
+          {!semAreas && (
+            <button
+              className="px-3 py-1.5 text-sm font-medium text-white bg-white/10 border border-white/10 rounded-lg depth-btn transition-all duration-150 hover:bg-white/20 hover:border-white/30 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f3d63]"
+              onClick={() => setOpenSettings(true)}
+              aria-label="Área Atuação"
+            >
+              Área Atuação
+            </button>
+          )}
           <button
             className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg depth-btn transition-all duration-150 hover:bg-red-700 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f3d63]"
             onClick={handleSignOut}

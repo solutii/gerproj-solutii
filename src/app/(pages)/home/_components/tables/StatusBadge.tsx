@@ -1,6 +1,7 @@
 import { StatusChamadoType } from "@/types/chamados";
 
-const STYLES: Record<StatusChamadoType, string> = {
+// Cores de cada status do chamado. Também usadas no card "Chamados abertos" do dashboard do administrador.
+export const STYLES: Record<StatusChamadoType, string> = {
     "EM ATENDIMENTO": "bg-blue-500 text-white border-blue-600",
     "ATRIBUIDO": "bg-slate-500 text-white border-slate-600",
     "STANDBY": "bg-yellow-500 text-white border-yellow-600",

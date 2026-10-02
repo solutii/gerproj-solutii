@@ -32,9 +32,9 @@ describe("duracaoEmMinutos / formatarDuracao", () => {
   });
 
   it("formata horas e minutos", () => {
-    expect(formatarDuracao(510)).toBe("8h30");
-    expect(formatarDuracao(480)).toBe("8h");
-    expect(formatarDuracao(425)).toBe("7h05");
+    expect(formatarDuracao(510)).toBe("8hs:30min");
+    expect(formatarDuracao(480)).toBe("8hs:00min");
+    expect(formatarDuracao(425)).toBe("7hs:05min");
   });
 });
 
@@ -48,7 +48,7 @@ describe("mensagemConfirmacaoApontamento", () => {
 
   it("mais de 7 horas avisa a duração antes da pergunta", () => {
     const msg = mensagemConfirmacaoApontamento(base, "09:00", "16:30");
-    expect(msg).toContain("7h30");
+    expect(msg).toContain("7hs:30min");
     expect(msg).toContain("mais de 7 horas");
     expect(msg.endsWith(base)).toBe(true);
   });

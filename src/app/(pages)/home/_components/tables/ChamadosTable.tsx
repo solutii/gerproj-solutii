@@ -14,6 +14,8 @@ import {
 import { ChamadosType, STATUS_CHAMADO } from "@/types/chamados";
 import { useHomeStore } from "@/stores/home-store";
 import { useAlertStore } from "@/stores/alert-store";
+import { useChamados } from "@/hooks/queries/leituras";
+import { useAnexarArquivo, useBaixarAnexos } from "@/hooks/queries/mutacoes";
 import {
   changeSelectedCall,
   openAccess,
@@ -69,13 +71,15 @@ const COLUMN_WIDTHS: Record<string, string> = {
 
 export default function ChamadosTable({ onStart, onChangeStatus }: Props) {
   const {
-    calls,
     selectedCall,
     setSelectedCall,
     setModalStandby,
     setIsUploading,
   } = useHomeStore();
   const showAlert = useAlertStore((state) => state.showAlert);
+  const { data: calls = [] } = useChamados();
+  const anexar = useAnexarArquivo();
+  const baixar = useBaixarAnexos();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
@@ -92,17 +96,10 @@ export default function ChamadosTable({ onStart, onChangeStatus }: Props) {
   });
 
   function handleUpload(chamado: ChamadosType, file: File) {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("codChamado", String(chamado?.COD_CHAMADO));
-
     setIsUploading(true);
 
-    fetch("/api/upload/?codChamado=" + chamado?.COD_CHAMADO, {
-      method: "POST",
-      body: formData,
-    })
-      .then((res) => res.json())
+    anexar
+      .mutateAsync({ codChamado: chamado?.COD_CHAMADO, arquivo: file })
       .then((data) => {
         if (data.success) {
           showAlert(
@@ -127,11 +124,10 @@ export default function ChamadosTable({ onStart, onChangeStatus }: Props) {
   }
 
   function handleDownload(chamado: ChamadosType) {
-    fetch("/api/arquivos?codChamado=" + chamado?.COD_CHAMADO)
-      .then(async (res) => {
-        const contentType = res.headers.get("Content-Type") ?? "";
-
-        if (!contentType.includes("zip")) {
+    baixar
+      .mutateAsync(chamado?.COD_CHAMADO)
+      .then((blob) => {
+        if (!blob) {
           showAlert(
             `O chamado #${chamado?.COD_CHAMADO} não possui arquivos anexados.`,
             "warning",
@@ -139,7 +135,6 @@ export default function ChamadosTable({ onStart, onChangeStatus }: Props) {
           return;
         }
 
-        const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;

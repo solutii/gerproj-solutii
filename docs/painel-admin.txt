@@ -1,0 +1,217 @@
+PAINEL DE CONTROLE DO ADMINISTRADOR  (/admin)  -  02/10/2026
+============================================================
+
+PARA QUE SERVE
+--------------
+  Há permissões que só o usuário ADM podia mudar, direto no banco. Agora o ADM
+  faz isso por uma página própria, com validação, confirmação e histórico de quem
+  alterou o quê. Nenhuma tabela, coluna ou estrutura nova foi criada no banco:
+  o painel só edita colunas que já existiam e que as regras do sistema já leem.
+
+
+QUEM VÊ O QUÊ
+-------------
+  USUARIO.TIPO_USUARIO = "ADM"  (administrador)  ou "USU" (consultor).
+
+  - O ADM, ao entrar, cai direto em /admin e SÓ enxerga o painel. Se tentar abrir
+    /home, volta para /admin. As rotas do consultor (apontamentos, chamados,
+    Meu Painel, áreas de atuação...) respondem 403 para ele.
+    Se o ADM precisar apontar horas, tem que entrar com outro usuário (um de
+    consultor).
+  - O consultor não entra no painel: /admin volta para /home e as rotas
+    /api/admin respondem 403.
+  - O bloqueio é do SERVIDOR (middleware), não só de botão escondido. Além disso,
+    cada chamada de /api/admin confere o tipo NO BANCO: quem deixa de ser ADM
+    perde o acesso na hora, sem esperar a sessão expirar.
+  - O ADM pode editar o próprio cadastro de consultor, se ele tiver um.
+  - Atenção: o administrador mestre tem COD_USUARIO = 0 (valor "falso" em
+    JavaScript). O código trata isso de propósito (há teste). Não troque a checagem
+    por "if (!codigo)".
+
+
+O QUE O PAINEL EDITA
+--------------------
+  Aba CONSULTORES (tabela RECURSO)
+    Apontar no passado ........ PERMAPO_RECURSO (SIM/NAO). Com NAO o consultor só
+                                aponta de ontem em diante; com SIM, desde a data-limite.
+    Data-limite ............... DTLIMITE_RECURSO. Primeiro dia em que pode apontar
+                                (só vale com "apontar no passado" = SIM). Não pode ser futura.
+    Jornada diária ............ HRDIA_RECURSO ("HH:MM", de 01:00 a 12:00). É a base
+                                da meta do Meu Painel.
+  Aba TAREFAS (tabela TAREFA)
+    Liberar estouro do limite . PERIMP_TAREFA (SIM/NAO). SIM = aceita apontar acima
+                                do limite de horas.
+    Limite mensal (horas) ..... LIMMES_TAREFA (inteiro 0 a 744; vazio = sem limite).
+                                Usado no StandBy do chamado.
+    Horas contratadas ......... HRREAL_TAREFA (até 2 casas decimais). Usado no
+                                apontamento direto na tarefa.
+  Aba HISTÓRICO: quem alterou o quê (somente leitura).
+  Aba DASHBOARD: números de todos os consultores (somente leitura; ver a seção abaixo).
+
+  Só esses campos podem ser alterados. Qualquer outro campo enviado ao servidor é
+  recusado (400). O servidor valida tudo (utils/admin-validacao.ts); a tela só ajuda.
+
+
+DASHBOARD DO ADMINISTRADOR  (aba "Dashboard", a primeira do painel)  -  02/10/2026
+-----------------------------------------------------------------------------------
+  Números de TODOS os consultores, só para consulta, por mês (seletor de mês no topo).
+  SOMENTE LEITURA: só consultas SELECT; nada é gravado no banco e nenhuma tabela nova
+  foi criada. Só o administrador acessa (consultor recebe 403).
+
+  Blocos
+    Visão geral ........... horas contra a meta (jornada x dias úteis de cada consultor),
+                            mês anterior no MESMO ponto do mês, chamados abertos/parados/
+                            finalizados, consultores com dia útil sem OS, tarefas em risco.
+    Comparativo ........... uma linha por consultor, ordenável pelo cabeçalho: horas/meta,
+                            % da meta, variação contra o mês anterior, dias que bateu a
+                            jornada, chamados atendidos/abertos, SLA no prazo e lançamentos
+                            atrasados. Clicar no nome abre o painel completo dele (só leitura).
+    Tarefas ............... "perto do limite" (80% ou mais do limite mensal, ou estourada,
+                            sem estouro liberado) e "com estouro liberado" (PERIMP = SIM).
+                            O botão de editar abre o mesmo modal da aba Tarefas.
+    Chamados .............. abertos por situação; abertos x concluídos por semana (8 semanas,
+                            segunda a domingo); parados há mais de 7 dias (TODOS, ordenáveis; mostra 10 e, expandido, 25 por página com slide; botões de página no cabeçalho e no rodapé);
+                            abertos no mês por cliente e por área de atuação.
+    Qualidade ............. dias úteis sem apontamento (uma linha por consultor, com TODOS os dias); permissão de apontar no
+                            passado a rever; lançamentos atrasados.
+  Duração (horas e minutos) sai sempre como "HHh:MMmin": "h" quando as horas são 0 ou 1
+  ("0h:30min", "1h:30min") e "hs" a partir de 2 ("8hs:48min", "45hs:30min", "8hs:00min"). É a
+  mesma função em todo o sistema (painel, dashboard, gráficos, avisos de apontamento e mensagens
+  do servidor). Quantidades de horas "cheias" que o ADM cadastra (limite mensal, horas
+  contratadas, horas estimadas) continuam como "40h", "1.500,5h".
+  Números grandes saem com separador de milhar (pt-BR): 4.233h36, 1.234 chamados, chamado 15.186
+  (igual ao número do chamado na Home). Vale também no Meu Painel (horas), nos gráficos, no
+  histórico e na exportação em PDF/HTML. O CSV NÃO leva separador de milhar de propósito (números
+  puros, para o Excel conseguir somar), e campos que se digitam (ex.: horas contratadas) também não.
+  Card "Chamados abertos": um badge por situação, na ordem fixa Não iniciado, Em atendimento, Atribuído,
+  StandBy, Aguardando validação e Finalizado (só as que têm chamados), com as MESMAS cores da tabela de
+  chamados do consultor (mapa STYLES de StatusBadge.tsx), centralizados no card. O badge tem relevo
+  saliente suave (.depth-badge, de propósito diferente do .depth-btn dos botões) e o número fica num
+  fundo afundado (.depth-contador), ambos em globals.css.
+  Clicar num badge de situação abre, no próprio card, a tabela dos chamados daquela situação (número,
+  cliente, assunto e consultor), ordenável (3 cliques) e com rolagem própria. O badge clicado SAI da
+  fileira e vai para o cabeçalho da tabela; o X fecha e ele VOLTA ao lugar dele (com o foco); clicar em
+  outro badge troca a lista. Os badges ficam centralizados só na horizontal.
+  O servidor passa a enviar a lista de TODOS os chamados abertos (chamados.abertos) junto do dashboard.
+  Cada card tem no cabeçalho, por último (depois de "Ver todas"), um botão "?" que abre uma janela
+  com o resumo do card: para que serve, o que mostra e como ler. Os textos ficam em
+  src/app/(pages)/admin/_components/dashboard/ajudas.ts: se uma regra do card mudar, atualize lá
+  (um teste confere as frases-chave). A janela fecha só com X, "Entendi" ou Esc (clicar fora NÃO fecha).
+  Os 11 cards do painel de detalhe do consultor (clicar no nome dele) também têm o "?", com textos próprios
+  (AJUDAS_DO_DETALHE, no mesmo arquivo). No Meu Painel do próprio consultor esses cards NÃO têm o botão.
+  Comparativo: clicar no cabeçalho ordena em 3 passos (crescente, decrescente e ordem padrão = maior
+  % da meta primeiro, sem seta); passar o mouse mostra "Clique para ordenar".
+  Cards com mais de 10 linhas (comparativo, tarefas, chamados parados e os três de qualidade)
+  abrem recolhidos, mostrando as 10 primeiras, e ganham no cabeçalho o botão "Ver todas (N)",
+  que vira "Recolher". Com até 10 linhas não há botão. Cada card tem o seu estado. A
+  exportação sempre leva a lista completa, independente do card estar recolhido.
+  Exportação: "Baixar Excel (CSV)" e "Imprimir / salvar PDF". É montada no navegador com
+  os mesmos números da tela (não consulta o banco de novo).
+
+  Regras que valem a pena saber
+    - Entram só consultores ATIVOS que NÃO são administradores (TIPO_USUARIO <> 'ADM').
+    - Os números são os MESMOS do Meu Painel de cada consultor: o dashboard reaproveita as
+      funções dele (duração da OS, dias úteis, meta, comparação, chamado parado, SLA). Um
+      teste de integração compara os dois no banco local (ver "Como foi verificado").
+    - Lançamento atrasado: OS lançada (OS.DTINC_OS) mais de 1 dia útil depois do dia
+      trabalhado. Sexta lançada na segunda NÃO conta. OS sem data de lançamento fica fora.
+    - Permissão a rever: "apontar no passado" = SIM com data-limite ANTERIOR AO INÍCIO DO MÊS
+      PASSADO (ou sem data). Na prática a data-limite é renovada no dia 1º de cada mês, então
+      a de até um mês atrás é normal e não aparece.
+    - Chamados por cliente/área contam os chamados ABERTOS (DATA_CHAMADO) dentro do mês;
+      concluídos por semana vêm do histórico do chamado (evento FINALIZADO), como o SLA.
+      Muitos chamados não têm área: aparecem em "Sem área".
+    - No começo do mês os blocos "do mês" ficam quase vazios: é normal, troque para o mês anterior.
+
+  Desempenho e cache
+    - Roda em cerca de 1 segundo no banco local (poucas consultas, só as colunas necessárias).
+    - O dashboard SE ATUALIZA SOZINHO a cada 5 minutos enquanto a página está aberta (o navegador
+      pausa isso se a aba ficar escondida e, ao voltar para ela depois de 5 minutos, atualiza).
+      Só busca quando a aba Dashboard está na tela.
+    - No cabeçalho, à direita do título "Painel de Controle", há um selo com "Atualizado há N min",
+      a hora (Brasília) e "próxima atualização em N min". Uma barra fina na base do selo enche
+      de forma contínua e proporcional aos 5 minutos desde a ÚLTIMA busca (qualquer busca, seja
+      a automática, o clique ou a volta à janela, reinicia a contagem); durante a busca a barra
+      fica cheia e pulsando. Clicar nele atualiza NA HORA, ignorando o
+      cache do servidor. Se uma atualização falhar, os números antigos continuam na tela e o
+      selo avisa ("Falha ao atualizar"); clicar tenta de novo.
+    - O servidor guarda o resultado por 2 minutos (vários administradores não repetem a conta),
+      menos que o intervalo de 5 minutos, então a busca automática sempre traz números novos.
+    - Qualquer alteração feita pelo painel (consultor ou tarefa) descarta o cache do servidor,
+      então o administrador vê o efeito na hora.
+    - O cache é por processo (em memória): reiniciar o sistema o limpa.
+
+  Rotas (todas GET, só administrador, sem cache no navegador)
+    /api/admin/dashboard?mes=AAAA-MM[&atualizar=1]
+    /api/admin/dashboard/consultor/[codigo]?mes=AAAA-MM   (o Meu Painel do consultor)
+  O mês é validado (AAAA-MM, de 2000 até o mês atual) e o código do consultor precisa existir.
+
+  Arquivos
+    Cálculo ......... src/services/admin/dashboard.ts (+ dashboard-cache.ts)
+    Regras puras .... src/utils/admin-dashboard.ts, admin-dashboard-export.ts
+    SLA comum ....... src/services/painel/sla-chamados.ts (usado também pelo Meu Painel)
+    Tela ............ src/app/(pages)/admin/_components/dashboard/
+    Testes .......... *.test.ts(x) ao lado de cada arquivo; dashboard.integracao.test.ts (banco
+                      local, desligado por padrão: INTEGRACAO_BANCO=1); e2e/admin.spec.ts
+
+
+COMO UMA ALTERAÇÃO É GRAVADA
+----------------------------
+  1. A tela envia só o que mudou, e o botão só habilita com mudança válida.
+  2. Antes de gravar, o ADM confirma uma frase como
+     "Apontar no passado: Não -> Sim; Jornada: 08:48 -> 09:00".
+  3. O servidor grava na fila de gravações do sistema (uma por vez), em transação,
+     e confirma depois do commit que o banco ficou com o valor pedido (mesmo
+     cuidado das OS: ver docs/gravacoes-no-banco.txt).
+  4. Se nada mudou de verdade, não grava e não registra.
+
+
+AUDITORIA (quem alterou o quê)  -  fica em ARQUIVO, nunca no banco
+------------------------------------------------------------------
+  Pasta:   logs/auditoria/auditoria-AAAA-MM.log   (um arquivo por mês; criada
+           sozinha na primeira alteração; fora da pasta public, não é servida pela web)
+  Formato: uma linha JSON por evento, só acrescentando no final.
+  Conteúdo: data/hora, quem (código, nome, login, IP), o quê (consultor ou tarefa),
+            valor antes e depois SÓ dos campos alterados. Nunca senha, segredo nem
+            o corpo da requisição.
+  Corrente de hash: cada linha traz o hash da anterior. Se alguém editar, apagar ou
+  trocar a ordem de uma linha, a aba Histórico mostra um aviso vermelho com o arquivo
+  e a linha. Não impede quem tem acesso à pasta do servidor de mexer, mas deixa rastro.
+  Duas linhas por alteração: "alteracao" (escrita antes do commit, dentro da
+  transação) e "confirmacao" (depois do commit: confirmada ou falhou).
+  FALHA-FECHADA: se a linha de auditoria não puder ser escrita (disco cheio, sem
+  permissão), a alteração é RECUSADA e nada muda no banco.
+  Situação mostrada no Histórico:
+     Confirmada ........ gravação confirmada no banco
+     Não aplicada ...... a gravação falhou (o motivo aparece)
+     Sem confirmação ... não há desfecho (ex.: o sistema parou no meio); confira o valor
+  Retenção: manual. Arquivar meses antigos é seguro (o primeiro arquivo que sobra
+  não é conferido com o anterior). Apagar um mês do MEIO da sequência aparece como
+  quebra de corrente.
+  Backup: inclua logs\auditoria no backup do servidor. O script de deploy NÃO mexe
+  na pasta logs.
+
+
+AO SUBIR PARA O SERVIDOR
+------------------------
+  - Nenhuma variável nova no .env; nenhuma dependência nova.
+  - As sessões abertas ANTES do deploy não têm o tipo de usuário: o ADM precisa sair
+    e entrar de novo para ser reconhecido (até lá ele é tratado como consultor).
+    Os consultores não percebem nada.
+  - O servidor precisa conseguir escrever em logs\auditoria (o usuário que roda o
+    sistema já escreve em logs\).
+  - Para dar acesso a alguém: o TIPO_USUARIO dele no banco precisa ser "ADM" (isso é
+    feito fora do painel). Para tirar: voltar para "USU"; vale na hora.
+  - Confira no banco do servidor, só lendo, que os ADM têm consultor vinculado
+    (RECURSO.CODUSR_RECURSO): o login exige o vínculo. No banco local, os 4 ADM têm.
+
+
+ARQUIVOS
+--------
+  Acesso/roteamento ... src/utils/perfil.ts, src/middleware.ts, login/page.tsx
+  Guarda do servidor .. src/services/admin/permissao.ts (exigirAdmin)
+  Regras .............. src/utils/admin-validacao.ts, admin-form.ts, admin-historico.ts
+  Serviços ............ src/services/admin/{consultores,tarefas,alteracao,auditoria}.ts
+  Rotas ............... src/app/api/admin/{consultores,tarefas,historico}
+  Tela ................ src/app/(pages)/admin/
+  Testes .............. *.test.ts ao lado de cada arquivo; e2e/admin.spec.ts

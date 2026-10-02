@@ -9,10 +9,15 @@ import {
   useReactTable,
   type ColumnFiltersState,
 } from "@tanstack/react-table";
+import { useIsMutating } from "@tanstack/react-query";
 import Loading from "@/components/loading";
+import { useOsLista } from "@/hooks/queries/leituras";
 import { useHomeStore } from "@/stores/home-store";
-import { handleEdit, validCurrentDate } from "../homeActions";
-import { TbEdit, TbTrash, TbInbox } from "react-icons/tb";
+import { useAlertStore } from "@/stores/alert-store";
+import { useChamados, useTarefas } from "@/hooks/queries/leituras";
+import { destinoParaRepetir } from "@/utils/repetir-apontamento";
+import { handleEdit, repetirApontamento, validCurrentDate } from "../homeActions";
+import { TbCopy, TbEdit, TbTrash, TbInbox } from "react-icons/tb";
 import Tooltip from "@/components/tooltip";
 import ColumnFilterInput, { DisabledFilterInput } from "@/components/column-filter-input";
 
@@ -86,8 +91,29 @@ function getTimeOs(horaIni: string, horaFim: string) {
 }
 
 export default function OsListTable({ onDelete }: Props) {
-  const { listOs, loadingOs, selectedCall, selectedProj, selectedDate, selectedOs } =
-    useHomeStore();
+  const { selectedCall, selectedProj, selectedDate, selectedOs } = useHomeStore();
+  // A lista deriva do que está selecionado (chamado, tarefa ou data) e vem do cache do Query.
+  const { lista: listOs, carregando } = useOsLista();
+  // Excluir OS e vincular tarefa/classificação também mostram o carregando da lista.
+  const mutandoOs =
+    useIsMutating({ predicate: (m) => m.meta?.carregandoOs === true }) > 0;
+  const loadingOs = carregando || mutandoOs;
+  // Chamados e tarefas já estão em cache (a Home os carrega): sem requisição nova.
+  const { data: chamados = [] } = useChamados();
+  const { data: tarefas = [] } = useTarefas();
+  const showAlert = useAlertStore((state) => state.showAlert);
+
+  // Repetir: abre o apontamento (StandBy ou tarefa) com a descrição desta OS.
+  function repetir(os: any) {
+    const destino = destinoParaRepetir(os, chamados, tarefas);
+
+    if (destino.tipo === "indisponivel") {
+      showAlert(destino.motivo, "warning");
+      return;
+    }
+
+    repetirApontamento(destino);
+  }
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   const table = useReactTable({
@@ -168,7 +194,7 @@ export default function OsListTable({ onDelete }: Props) {
                   </th>
                 ))}
                 <th className="w-28">Qtd. Hr&apos;s Gastas</th>
-                <th className="w-24">Ações</th>
+                <th className="w-36">Ações</th>
               </tr>
             ))}
             <tr className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
@@ -180,7 +206,7 @@ export default function OsListTable({ onDelete }: Props) {
               <th className="w-28 p-1.5">
                 <DisabledFilterInput />
               </th>
-              <th className="w-24 p-1.5">
+              <th className="w-36 p-1.5">
                 <DisabledFilterInput />
               </th>
             </tr>
@@ -225,8 +251,17 @@ export default function OsListTable({ onDelete }: Props) {
                     {getTimeOs(os.HRINI_OS, os.HRFIM_OS)}
                   </td>
                   <td>
+                    <div className="flex flex-row gap-2 justify-evenly">
+                      <Tooltip content="Repetir apontamento (mesma descrição, nova data e horário)">
+                        <TbCopy
+                          onClick={() => repetir(os)}
+                          style={{ cursor: "pointer" }}
+                          className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full p-1 transition hover:scale-125 depth-icon"
+                          size={28}
+                        />
+                      </Tooltip>
                     {validCurrentDate(os.DTINI_OS) && (
-                      <div className="flex flex-row gap-2 justify-evenly">
+                      <>
                         <Tooltip content="Editar apontamento">
                           <TbEdit
                             onClick={() => handleEdit(os)}
@@ -243,8 +278,9 @@ export default function OsListTable({ onDelete }: Props) {
                             size={28}
                           />
                         </Tooltip>
-                      </div>
+                      </>
                     )}
+                    </div>
                   </td>
                 </tr>
               );

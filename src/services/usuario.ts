@@ -28,6 +28,7 @@ export default async function UserService({ login, password } :{ login: string, 
                 `SELECT 
                     U.COD_USUARIO,
                     U.SENHA, 
+                    U.TIPO_USUARIO,
                     CAST(U.NOME_USUARIO AS VARCHAR(32000) CHARACTER SET WIN1252) AS NOME_USUARIO, 
                     R.COD_RECURSO,
                     DTLIMITE_RECURSO 

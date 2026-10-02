@@ -14,6 +14,7 @@ import {
 import { TaskType } from "@/types/tarefa";
 import { useHomeStore } from "@/stores/home-store";
 import { changeSelectedCallTrf, selectProjRow } from "../homeActions";
+import { useTarefas } from "@/hooks/queries/leituras";
 import Tooltip from "@/components/tooltip";
 import ColumnFilterInput, { DisabledFilterInput } from "@/components/column-filter-input";
 import {
@@ -49,7 +50,8 @@ const COLUMN_WIDTHS: Record<string, string> = {
 };
 
 export default function ProjetosTable() {
-  const { projes, selectedProj, setModalApontamento } = useHomeStore();
+  const { selectedProj, setModalApontamento } = useHomeStore();
+  const { data: projes = [] } = useTarefas();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 

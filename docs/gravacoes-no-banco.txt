@@ -1,0 +1,91 @@
+GRAVAÇÕES NO BANCO: NÚMEROS NOVOS, COMMIT E CONCORRÊNCIA (02/10/2026)
+=====================================================================
+
+O PROBLEMA
+----------
+  Criar uma OS ou um registro de histórico do chamado usa "MAX + 1" para achar
+  o próximo número (COD_OS, COD_HISTCHAMADO, NUM_OS). Não há generator nem
+  trigger no banco (conferido na cópia local: só existem as chaves primárias
+  PK_OS, PK_CHAMADO, PK_HISTCHAMADO; Firebird 2.1).
+
+  O código antigo lia o número FORA da transação, bem antes do INSERT. Dois
+  consultores gravando no mesmo instante recebiam o MESMO número.
+
+  Medido de verdade (Firebird 2.1 + node-firebird 1.1.10, com um script cru, sem
+  nenhum código do sistema no meio): quando duas transações inserem o mesmo
+  número ao mesmo tempo, o driver devolve "sucesso" no INSERT E no commit das
+  duas, mas só UMA linha fica no banco. A outra gravação é PERDIDA EM SILÊNCIO e
+  o consultor via "apontamento registrado com sucesso". (Se houver outro comando
+  logo depois do INSERT perdido, o driver chega a lançar uma exceção dentro do
+  tratamento da resposta de rede, o que pode derrubar o processo.)
+  Isso já acontecia no código antigo.
+
+  Também havia rotas que respondiam "sucesso" ANTES de o commit terminar
+  (editar e excluir OS, ligar tarefa/classificação ao chamado, dados de acesso).
+
+
+O QUE FOI FEITO
+---------------
+  src/services/transacao.ts   o jeito único de gravar:
+    - emTransacao: abre a transação, só devolve DEPOIS do commit, faz rollback
+      em qualquer erro e sempre devolve a conexão ao pool.
+    - o próximo número é lido DENTRO da transação (proximoCodigo,
+      proximoNumeroOs).
+    - gravar: refaz a gravação inteira se der "chave duplicada" (até 10 vezes) e
+      aceita uma confirmação depois do commit (confirmar).
+    - gravarEmSerie: gravar() uma de cada vez (fila única de gravações do
+      sistema web). Tem tempo máximo de espera (45 s), então uma gravação
+      emperrada nunca trava a fila para sempre.
+  src/services/trava.ts       a fila (estado em globalThis, porque o Next
+                              empacota cada rota separadamente).
+  src/services/os/regras-apontamento.ts
+                              conferirConflitoNaTransacao: a conferência de
+                              horário ocupado agora também roda dentro da
+                              transação, colada ao INSERT.
+
+  Duas defesas, uma em cima da outra:
+    a) FILA: as gravações do sistema web não disputam número entre si. Clique
+       duplo no mesmo horário também resolve: a segunda espera a primeira
+       confirmar e então enxerga o conflito (só uma OS é criada).
+    b) CONFIRMAÇÃO: depois do commit, cada gravação que cria número confere no
+       banco se a linha realmente existe. Se não existir, refaz com número novo.
+       Cobre o caso que a fila não alcança: o sistema legado em Delphi gravando
+       no mesmo banco ao mesmo tempo.
+
+  Serviços migrados: os/apoint, os/update, os/delete, call/start,
+  call/change-status, call/standby, call/update, call/updateClassificacao,
+  tarefa/acesso. O e-mail de validação agora sai só depois do commit.
+
+
+TESTES
+------
+  Unitários (rodam sempre): src/services/transacao.test.ts, trava.test.ts e
+  gravacoes.test.ts. O último usa um banco falso COM ESTADO e chave primária,
+  imita a perda silenciosa do driver e prova: dez consultores ao mesmo tempo
+  gravam todos, sem número repetido; clique duplo cria uma OS; a confirmação
+  percebe a gravação perdida e refaz.
+
+  Integração com o Firebird de verdade (desligado por padrão; só no banco LOCAL,
+  tem trava que recusa outro host):
+      $env:INTEGRACAO_BANCO = "1"
+      npx vitest run src/services/concorrencia.integracao.test.ts
+  Cobre: vários consultores ao mesmo tempo, clique duplo, e um "outro programa"
+  gravando o mesmo número. Apaga tudo o que cria. Inclui um teste CANÁRIO que
+  documenta a perda silenciosa do driver: se um dia ele FALHAR, o driver foi
+  corrigido e a confirmação pode ser revista.
+  Dica: LIKE com parâmetro em campo BLOB dá erro -303 no Firebird 2.1; use o
+  texto literal.
+
+
+LIMITES CONHECIDOS
+------------------
+  - A fila vale dentro de UM processo do Node (como o sistema roda hoje: pm2 /
+    next start com uma instância). Com mais de uma instância, só a confirmação
+    depois do commit protege (e o ideal seria uma trava no banco).
+  - A solução definitiva seria o banco gerar o número (generator + trigger),
+    mas o sistema em Delphi também grava nas mesmas tabelas e precisaria usar o
+    mesmo mecanismo. Mexer no banco não foi necessário.
+  - Há código sem uso com o padrão antigo (src/services/tarefa/apointe.ts,
+    standby.ts, start.ts, change-status.ts, update.ts e call/apointe.ts): não é
+    chamado por nenhuma rota. Podem ser apagados.
+  - O PDF/e-mail e demais leituras não mudaram.

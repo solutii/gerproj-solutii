@@ -1,3 +1,5 @@
+import { formatarHoras } from "./painel/horas";
+
 // Intervalo de um apontamento: a hora final precisa ser maior que a inicial
 // (horas "HH:MM"; inicial igual à final, ou maior, é inválido).
 export function intervaloInvalido(startTime: string, endTime: string): boolean {
@@ -20,12 +22,9 @@ export function duracaoEmMinutos(startTime: string, endTime: string): number {
   return hf * 60 + mf - (hi * 60 + mi);
 }
 
-// 510 -> "8h30", 480 -> "8h"
+// 510 -> "8hs:30min", 480 -> "8hs:00min", 90 -> "1h:30min" (mesmo formato do painel)
 export function formatarDuracao(minutos: number): string {
-  const horas = Math.floor(minutos / 60);
-  const resto = minutos % 60;
-
-  return resto === 0 ? `${horas}h` : `${horas}h${String(resto).padStart(2, "0")}`;
+  return formatarHoras(minutos);
 }
 
 // Mensagem do "Confirmar" do modal: se o lançamento passa de 7 horas, avisa

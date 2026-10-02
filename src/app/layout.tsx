@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { NextAuthProvider } from "@/providers/auth-provider";
+import { QueryProvider } from "@/providers/query-provider";
 import ThemeInitializer from "@/components/theme-initializer";
 import AlertDialog from "@/components/alert-dialog";
 const poppins = Poppins({
@@ -21,7 +22,11 @@ export default function RootLayout({
 }>) {
   return (
     <NextAuthProvider>
-      <html lang="en">
+      {/* suppressHydrationWarning: o script abaixo adiciona a classe "dark" no
+          <html> antes de o React hidratar (evita o flash claro), então o HTML do
+          servidor e o do navegador diferem de propósito nesse atributo. Vale só
+          para este elemento, não para os filhos. */}
+      <html lang="en" suppressHydrationWarning>
         <head>
           {/* Aplica a classe "dark" antes do primeiro paint, lendo direto
                 do localStorage -- sem isso, a página sempre nasce clara e só
@@ -46,7 +51,7 @@ export default function RootLayout({
         <body className={poppins.className}>
           <ThemeInitializer />
           <AlertDialog />
-          {children}
+          <QueryProvider>{children}</QueryProvider>
         </body>
       </html>
     </NextAuthProvider>

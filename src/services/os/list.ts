@@ -49,6 +49,8 @@ export default (function OsService() {
                         OS.DTINI_OS,
                         OS.HRINI_OS,
                         OS.HRFIM_OS,
+                        OS.CHAMADO_OS,
+                        OS.CODTRF_OS,
                         CLIENTE.NOME_CLIENTE
                     FROM OS
                     LEFT JOIN CHAMADO ON (OS.chamado_os = CHAMADO.cod_chamado)
@@ -105,6 +107,8 @@ export default (function OsService() {
                         OS.DTINI_OS,
                         OS.HRINI_OS,
                         OS.HRFIM_OS,
+                        OS.CHAMADO_OS,
+                        OS.CODTRF_OS,
                         CLIENTE.NOME_CLIENTE
                     FROM OS
                     LEFT JOIN CHAMADO ON (OS.chamado_os = CHAMADO.cod_chamado)

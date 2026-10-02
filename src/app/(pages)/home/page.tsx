@@ -1,12 +1,36 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect } from "react";
+import { ChangeEvent, FormEvent } from "react";
 import DateInput from "@/components/date-input";
 import { useSession, signOut } from "next-auth/react";
 import { useHomeStore } from "@/stores/home-store";
 import { useAlertStore } from "@/stores/alert-store";
 import { estourouLimiteHoras } from "@/utils/limite-horas";
-import { agoraNoFuso } from "@/utils/horario-futuro";
+import { ApiError, mensagemDoErro } from "@/lib/api";
+import { chaveRascunhoChamado, chaveRascunhoTarefa, descartarRascunho } from "@/utils/rascunho";
+import {
+  buscarTarefaDoApontamento,
+  listarClassificacoes,
+  listarTarefasParaChamado,
+  validarHorasChamado,
+  validarHorasTarefa,
+} from "@/lib/api-home";
+import {
+  useChamados,
+  usePeriodoApontamento,
+  useTarefas,
+} from "@/hooks/queries/leituras";
+import {
+  useAlterarStatusChamado,
+  useAtualizarOs,
+  useColocarEmStandby,
+  useExcluirOs,
+  useIniciarChamado,
+  useRegistrarApontamento,
+  useSalvarAcesso,
+  useVincularClassificacao,
+  useVincularTarefa,
+} from "@/hooks/queries/mutacoes";
 import {
   descricaoInvalida,
   MENSAGEM_DESCRICAO,
@@ -24,11 +48,18 @@ import { TaskType } from "@/types/tarefa";
 import UserComponent from "@/components/user";
 import Loading from "@/components/loading";
 import SessionGuard from "@/components/session-guard";
+import PainelAba from "./_components/painel/PainelAba";
+import AvisoDiasPendentes from "./_components/AvisoDiasPendentes";
+import AvisoChamadosNovos from "./_components/AvisoChamadosNovos";
 import { TbCircleX, TbClockHour4 } from "react-icons/tb";
 import {
+  cancelarApontamentoSugerido,
   closeApontamentoModal,
   closeEditOsModal,
   closeStandbyModal,
+  selectCallRow,
+  selectProjRow,
+  sugerirApontamento,
   validCurrentDate,
 } from "./_components/homeActions";
 import ChamadosTable from "./_components/tables/ChamadosTable";
@@ -48,12 +79,8 @@ export default function Home() {
   const { data: session } = useSession();
   const showAlert = useAlertStore((state) => state.showAlert);
   const {
-    calls,
-    setCalls,
     tab,
     setTab,
-    projes,
-    setProjes,
     isOpenModal,
     setOpenModal,
     isOpenModal2,
@@ -79,12 +106,6 @@ export default function Home() {
     setIsChangeAccess,
     isProcessing,
     setIsProcessing,
-    loadingOs,
-    setLoadingOs,
-    loadingTables,
-    setLoadingTables,
-    listOs,
-    setListOs,
     hours,
     setHours,
     selectedTask,
@@ -106,11 +127,27 @@ export default function Home() {
     setDirectionOrder,
     selectedDate,
     setSelectedDate,
-    limitDate,
-    setLimitDate,
-    tomorrow,
-    setTomorrow,
+    apontamentoSugerido,
   } = useHomeStore();
+
+  // Dados do servidor (Query): carregam uma vez e ficam em cache; trocar de
+  // aba ou reabrir uma tela não refaz a busca enquanto o dado estiver fresco.
+  const chamadosQuery = useChamados();
+  const tarefasQuery = useTarefas();
+  usePeriodoApontamento(); // carrega o período de apontamento ao abrir a Home
+  const calls = chamadosQuery.data ?? [];
+  const projes = tarefasQuery.data ?? [];
+  const loadingTables = chamadosQuery.isPending || tarefasQuery.isPending;
+
+  const alterarStatus = useAlterarStatusChamado();
+  const iniciar = useIniciarChamado();
+  const registrarApont = useRegistrarApontamento();
+  const standby = useColocarEmStandby();
+  const salvarAcesso = useSalvarAcesso();
+  const vincularTarefa = useVincularTarefa();
+  const vincularClassificacao = useVincularClassificacao();
+  const excluir = useExcluirOs();
+  const atualizar = useAtualizarOs();
 
   function insertOs(event: FormEvent) {
     event.preventDefault();
@@ -121,12 +158,51 @@ export default function Home() {
   // de OS do chamado (ou da tarefa) selecionado na aba anterior continua
   // aparecendo na aba nova até o usuário selecionar outra coisa -- dando a
   // impressão de que aquelas OS's pertencem à aba atual.
-  function changeTab(newTab: "chamado" | "os") {
+  function changeTab(newTab: "chamado" | "os" | "painel") {
     setTab(newTab);
     setSelectedCall(null);
     setSelectedProj(null);
     setSelectedDate("");
-    setListOs([]);
+  }
+
+  // ─── Atalhos do Meu Painel ───────────────────────────────────────────────
+  // O painel só aponta o destino; a seleção e o carregamento das OS são os
+  // mesmos de um clique na tabela (os efeitos de selectedCall/selectedProj).
+
+  // Dia (e horário, se vier) escolhidos: o modal abre já preenchido quando o
+  // consultor clicar no relógio da tarefa.
+  function painelApontarEm(data: string, inicio: string = "", fim: string = "") {
+    changeTab("os");
+    sugerirApontamento(data, inicio, fim);
+  }
+
+  function painelIrParaChamado(codChamado: number) {
+    const chamado = calls.find((c) => c.COD_CHAMADO === codChamado);
+
+    if (!chamado) {
+      showAlert("Este chamado não está mais na sua lista de chamados.", "warning");
+      return;
+    }
+
+    changeTab("chamado");
+    selectCallRow(chamado);
+  }
+
+  function painelIrParaTarefa(codTarefa: number) {
+    const tarefa = projes.find((t) => Number(t.COD_TAREFA) === codTarefa);
+
+    if (!tarefa) {
+      showAlert("Esta tarefa não está mais na sua lista de tarefas.", "warning");
+      return;
+    }
+
+    changeTab("os");
+    selectProjRow(tarefa);
+  }
+
+  function painelVerOsDoDia(data: string) {
+    changeTab("chamado");
+    setSelectedDate(data);
   }
 
   // Filtro por data: lista as OS do recurso lançadas naquele dia (de qualquer
@@ -140,17 +216,11 @@ export default function Home() {
     setSelectedProj(null);
     setSelectedDate(value);
 
-    // Campo apagado pelo próprio seletor de data: não há o que buscar.
-    if (!value) {
-      setListOs([]);
-      return;
-    }
-
-    getAllOs(value);
+    // A lista de OS da data (ou o vazio, se o campo foi apagado) deriva de
+    // selectedDate -- o Query busca sozinho.
   }
 
   function clearSelectedDate() {
-    if (!selectedCall && !selectedProj) setListOs([]);
     setSelectedDate("");
   }
 
@@ -175,129 +245,41 @@ export default function Home() {
     return true;
   }
 
-  async function getAllOs(date: string = "") {
-    setLoadingOs(true);
+  // ─── Comunicação com a API ───────────────────────────────────────────────
+  // Leituras (chamados, tarefas, OS, período) vêm dos hooks do Query lá em
+  // cima; as gravações são mutations, que ao terminar já marcam como "velho"
+  // só o que mudou (ver hooks/queries/mutacoes). Aqui não há refetch manual.
 
-    let result = await fetch("/api/os/list", {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-      body: JSON.stringify({
-        chamado: selectedCall?.COD_CHAMADO,
-        data: date,
-        recurso: session?.user.recurso,
-      }),
-    })
-      .then((res) => res.json())
-      .then((res) => res)
-      .catch(() => {
-        setLoadingOs(false);
-      })
-      .finally(() => {
-        setLoadingOs(false);
-      });
+  function avisarErro(erro: unknown, padrao: string) {
+    showAlert(
+      mensagemDoErro(erro, padrao),
+      erro instanceof ApiError && erro.status === 0 ? "error" : "warning",
+    );
+  }
 
-    if (!result) {
-      setListOs([]);
-      return;
+  // Roda uma operação que fala com a API; se ela recusar (ou a rede cair),
+  // mostra o motivo e devolve { ok: false } -- quem chamou interrompe o fluxo.
+  async function tentar<T>(
+    operacao: () => Promise<T>,
+    padrao = "Não foi possível concluir a operação.",
+  ): Promise<{ ok: true; valor: T } | { ok: false }> {
+    try {
+      return { ok: true, valor: await operacao() };
+    } catch (erro) {
+      avisarErro(erro, padrao);
+      return { ok: false };
     }
-
-    setListOs(result);
-  }
-
-  // Aba Tarefas: com o filtro por data ativo (nenhuma tarefa selecionada) a
-  // lista é a das OS's da data; senão, a das OS's da tarefa selecionada.
-  function recarregarOsDaAbaTarefas() {
-    if (!selectedProj && selectedDate) {
-      getAllOs(selectedDate);
-      return;
-    }
-
-    getAllOsTarefa();
-  }
-
-  async function getAllOsTarefa(date: string = "") {
-    setLoadingOs(true);
-
-    let result = await fetch("/api/os/list-for-trf", {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-      body: JSON.stringify({
-        tarefa: selectedProj?.COD_TAREFA,
-        data: date,
-        recurso: session?.user.recurso,
-      }),
-    })
-      .then((res) => res.json())
-      .then((res) => res)
-      .catch(() => {
-        setLoadingOs(false);
-      })
-      .finally(() => {
-        setLoadingOs(false);
-      });
-
-    if (!result) {
-      setListOs([]);
-      return;
-    }
-
-    setListOs(result);
-  }
-
-  async function getCalls() {
-    let result = await fetch("/api/call/list?recurso=" + session?.user.recurso)
-      .then((res) => res.json())
-      .then((res) => res);
-
-    if (!result) return;
-
-    setCalls(result);
-  }
-
-  async function getTasksProject() {
-    let result = await fetch("/api/os/list?recurso=" + session?.user.recurso)
-      .then((res) => res.json())
-      .then((res) => res);
-
-    if (!result) return;
-
-    setProjes(result);
-  }
-
-  // Lê o JSON da resposta; se a API recusou (status de erro + { error }), mostra
-  // o motivo e devolve null -- quem chamou interrompe o fluxo.
-  async function lerJsonOuMostrarErro(response: Response): Promise<any | null> {
-    const json = await response.json();
-
-    if (!response.ok) {
-      showAlert(
-        json?.error ?? "Não foi possível concluir a operação.",
-        "warning",
-      );
-      return null;
-    }
-
-    return json;
   }
 
   async function changeStatus(chamado: ChamadosType, status: string) {
     setIsProcessing(true);
     try {
       if (chamado.CODTRF_CHAMADO === null) {
-        let selectedTasks: any = await lerJsonOuMostrarErro(
-          await fetch("/api/call/task", {
-            method: "POST",
-            body: JSON.stringify({ chamado }),
-          }),
-        );
-        if (selectedTasks === null) return;
+        const tarefas = await tentar(() => listarTarefasParaChamado(chamado));
+        if (!tarefas.ok) return;
 
         setSelectedTask(null);
-        setTasks(selectedTasks);
+        setTasks(tarefas.valor);
         setModalTarefa(true);
         return;
       }
@@ -306,90 +288,37 @@ export default function Home() {
         status != "START" &&
         (chamado.COD_CLASSIFICACAO === null || chamado.COD_CLASSIFICACAO === 0)
       ) {
-        let selectedClassificacao: any = await fetch(
-          "/api/call/classificacao",
-          {
-            method: "POST",
-            body: JSON.stringify({ chamado }),
-          },
-        ).then((response) => response.json());
+        const classificacoes = await tentar(() => listarClassificacoes(chamado));
+        if (!classificacoes.ok) return;
 
         setModalClassificacao(true);
         setSelectedClassificacao(null);
-        setClassificacao(selectedClassificacao);
+        setClassificacao(classificacoes.valor);
         return;
       }
 
-      /* let data = ""
-
-        if(status === STATUS_CHAMADO['FINALIZADO']) {
-            const now = new Date();
-            const defaultDatetime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-            const { value: dataFinalizacao, isConfirmed } = await Swal.fire({
-                title: 'Data de Finalização',
-                html: `<input type="datetime-local" id="swal-datetime" class="swal2-input" value="${defaultDatetime}" max="${defaultDatetime}">`,
-                showCancelButton: true,
-                confirmButtonText: 'Confirmar',
-                cancelButtonText: 'Cancelar',
-                preConfirm: () => {
-                    const input = document.getElementById('swal-datetime') as HTMLInputElement;
-                    if (!input.value) {
-                        Swal.showValidationMessage('A data de finalização é obrigatória!');
-                        return false;
-                    }
-                    const selectedDate = new Date(input.value);
-                    if (selectedDate > new Date()) {
-                        Swal.showValidationMessage('A data de finalização não pode ser maior que a data atual!');
-                        return false;
-                    }
-                    return input.value;
-                }
-            });
-
-            if (!isConfirmed || !dataFinalizacao) {
-                return;
-            }
-
-            // Parse de yyyy-MM-ddTHH:mm para dd.mm.aaaa HH:mm
-            const [datePart, timePart] = dataFinalizacao.split('T');
-            const [year, month, day] = datePart.split('-');
-            data = `${day}.${month}.${year} ${timePart}`;
-        } */
-
-      const response = await fetch(
-        "/api/call/change-status?codChamado=" +
-          chamado.COD_CHAMADO +
-          "&status=" +
-          status +
-          "&email=" +
-          chamado.EMAIL_CHAMADO,
-        { method: "POST" },
+      const alterado = await tentar(
+        () =>
+          alterarStatus.mutateAsync({
+            codChamado: chamado.COD_CHAMADO,
+            status,
+            email: chamado.EMAIL_CHAMADO,
+          }),
+        "Não foi possível alterar o status do chamado.",
       );
-      const result = await response.json();
+      if (!alterado.ok) return;
 
-      if (!response.ok) {
-        showAlert(
-          result?.error ?? "Não foi possível alterar o status do chamado.",
-          "warning",
-        );
-        return;
-      }
-
-      if (!result) return;
-
-      // Chamado finalizado sai da lista: se as OS's dele estavam abertas, some
-      // junto, em vez de ficar na tela esperando outra seleção.
+      // Chamado finalizado sai da lista: se as OS's dele estavam abertas, a
+      // seleção é desfeita e a lista some junto, em vez de ficar na tela
+      // esperando outra seleção.
       if (
         status === STATUS_CHAMADO["FINALIZADO"] &&
         useHomeStore.getState().selectedCall?.COD_CHAMADO === chamado.COD_CHAMADO
       ) {
         setSelectedCall(null);
-        setListOs([]);
       }
 
       setOpenModal(false);
-      getCalls();
     } finally {
       setIsProcessing(false);
     }
@@ -399,30 +328,22 @@ export default function Home() {
     setIsProcessing(true);
     try {
       if (chamado.CODTRF_CHAMADO === null) {
-        let selectedTasks: any = await lerJsonOuMostrarErro(
-          await fetch("/api/call/task", {
-            method: "POST",
-            body: JSON.stringify({ chamado }),
-          }),
-        );
-        if (selectedTasks === null) return;
+        const tarefas = await tentar(() => listarTarefasParaChamado(chamado));
+        if (!tarefas.ok) return;
 
         setSelectedTask(null);
-        setTasks(selectedTasks);
+        setTasks(tarefas.valor);
         setModalTarefa(true);
         return;
       }
 
-      let result = await lerJsonOuMostrarErro(
-        await fetch("/api/call/start?codChamado=" + chamado.COD_CHAMADO, {
-          method: "POST",
-        }),
+      const iniciado = await tentar(
+        () => iniciar.mutateAsync(chamado.COD_CHAMADO),
+        "Não foi possível iniciar o chamado.",
       );
-
-      if (!result) return;
+      if (!iniciado.ok) return;
 
       setOpenModal(false);
-      getCalls();
     } finally {
       setIsProcessing(false);
     }
@@ -461,19 +382,13 @@ export default function Home() {
 
     setIsProcessing(true);
     try {
-      //criar uma função identica a esta para validar as horas do projeto
-
-      let responseValidHours = await fetch("/api/os/valid-hours", {
-        method: "POST",
-        body: JSON.stringify({
-          chamado: os.COD_TAREFA,
-          date,
-          startTime: hours.initial,
-          endTime: hours.final,
-        }),
-      })
-        .then((res) => res.json())
-        .then((res) => res);
+      // Conferência do limite mensal no instante do clique (sempre fresca).
+      const responseValidHours = await validarHorasTarefa({
+        tarefa: os.COD_TAREFA,
+        date,
+        startTime: hours.initial,
+        endTime: hours.final,
+      });
 
       if (estourouLimiteHoras(responseValidHours)) {
         let horasTotais = responseValidHours[0] / 60;
@@ -487,55 +402,24 @@ export default function Home() {
         return;
       }
 
-      let task = await fetch("/api/get-task", {
-        method: "POST",
-        body: JSON.stringify({
-          COD_CHAMADO: os?.COD_OS,
-        }),
-      })
-        .then((res) => res.json())
-        .then((res) => res);
+      const task = await buscarTarefaDoApontamento(os?.COD_OS);
 
-      const responseApoint = await fetch("/api/os/apoint", {
-        method: "POST",
-        body: JSON.stringify({
-          os,
-          description,
-          date,
-          startTime: hours.initial,
-          endTime: hours.final,
-          recurso: session?.user.recurso,
-          state: "STANDBY",
-          task,
-        }),
+      await registrarApont.mutateAsync({
+        os,
+        description,
+        date,
+        startTime: hours.initial,
+        endTime: hours.final,
+        recurso: session?.user.recurso,
+        state: "STANDBY",
+        task,
       });
-      const result = await responseApoint.json();
 
-      if (!responseApoint.ok) {
-        showAlert(
-          result?.error ??
-            "Não foi possível registrar o apontamento. Tente novamente.",
-          "warning",
-        );
-        return;
-      }
-
-      if (!result) {
-        showAlert(
-          "Não foi possível registrar o apontamento. Tente novamente.",
-          "error",
-        );
-        return;
-      }
-
-      getAllOsTarefa();
+      descartarRascunho(chaveRascunhoTarefa(os.COD_TAREFA));
       closeApontamentoModal(false);
       showAlert("Apontamento registrado com sucesso!", "success");
-    } catch {
-      showAlert(
-        "Não foi possível registrar o apontamento. Verifique sua conexão e tente novamente.",
-        "error",
-      );
+    } catch (erro) {
+      avisarErro(erro, "Não foi possível registrar o apontamento. Tente novamente.");
     } finally {
       setIsProcessing(false);
     }
@@ -572,84 +456,50 @@ export default function Home() {
       return;
     }
 
-    let responseValidHours = await fetch("/api/call/valid-hours", {
-      method: "POST",
-      body: JSON.stringify({
+    setIsProcessing(true);
+    try {
+      const responseValidHours = await validarHorasChamado({
         chamado: chamado.COD_CHAMADO,
         date,
         startTime: hours.initial,
         endTime: hours.final,
-      }),
-    })
-      .then((res) => res.json())
-      .then((res) => res);
-
-    if (estourouLimiteHoras(responseValidHours, { ignorarLimiteZero: true })) {
-      let horasTotais = responseValidHours[0] / 60;
-      let horasApontadas = responseValidHours[1] / 60;
-
-      showAlert(
-        `Horas para esta tarefa já ultrapassaram o limite do mês, total final após apontamento: ${horasApontadas}h. ENTRE EM CONTATO COM A SOLUTII!`,
-        "warning",
-        `Horas mês: ${horasTotais}h`,
-      );
-
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      let task = await fetch("/api/get-task", {
-        method: "POST",
-        body: JSON.stringify({
-          COD_CHAMADO: selectedCall?.COD_CHAMADO,
-        }),
-      })
-        .then((res) => res.json())
-        .then((res) => res);
-
-      const responseStandby = await fetch("/api/call/standby", {
-        method: "POST",
-        body: JSON.stringify({
-          chamado,
-          description,
-          date,
-          startTime: hours.initial,
-          endTime: hours.final,
-          state: "STANDBY",
-          task,
-        }),
       });
-      const result = await responseStandby.json();
 
-      if (!responseStandby.ok) {
+      if (estourouLimiteHoras(responseValidHours, { ignorarLimiteZero: true })) {
+        let horasTotais = responseValidHours[0] / 60;
+        let horasApontadas = responseValidHours[1] / 60;
+
         showAlert(
-          result?.error ??
-            `Não foi possível colocar o chamado #${chamado.COD_CHAMADO} em standby. Tente novamente.`,
+          `Horas para esta tarefa já ultrapassaram o limite do mês, total final após apontamento: ${horasApontadas}h. ENTRE EM CONTATO COM A SOLUTII!`,
           "warning",
+          `Horas mês: ${horasTotais}h`,
         );
+
         return;
       }
 
-      if (!result) {
-        showAlert(
-          `Não foi possível colocar o chamado #${chamado.COD_CHAMADO} em standby. Tente novamente.`,
-          "error",
-        );
-        return;
-      }
+      const task = await buscarTarefaDoApontamento(selectedCall?.COD_CHAMADO);
 
-      getCalls();
-      getAllOs();
+      await standby.mutateAsync({
+        chamado,
+        description,
+        date,
+        startTime: hours.initial,
+        endTime: hours.final,
+        state: "STANDBY",
+        task,
+      });
+
+      descartarRascunho(chaveRascunhoChamado(chamado.COD_CHAMADO));
       closeStandbyModal(false);
       showAlert(
         `Chamado #${chamado.COD_CHAMADO} colocado em standby com sucesso!`,
         "success",
       );
-    } catch {
-      showAlert(
-        `Não foi possível colocar o chamado #${chamado.COD_CHAMADO} em standby. Verifique sua conexão e tente novamente.`,
-        "error",
+    } catch (erro) {
+      avisarErro(
+        erro,
+        `Não foi possível colocar o chamado #${chamado.COD_CHAMADO} em standby. Tente novamente.`,
       );
     } finally {
       setIsProcessing(false);
@@ -659,153 +509,68 @@ export default function Home() {
   async function salvarAcessoCliente() {
     setIsChangeAccess(true);
 
-    const responseAcesso = await fetch("/api/acesso", {
-      method: "POST",
-      body: JSON.stringify({
+    try {
+      await salvarAcesso.mutateAsync({
         descricao: accessText,
         cliente: accessCliente,
-      }),
-    });
+      });
 
-    if (!responseAcesso.ok) {
-      const erro = await responseAcesso.json().catch(() => null);
-      showAlert(
-        erro?.error ?? "Não foi possível salvar os dados de acesso.",
-        "warning",
-      );
+      setOpenModal2(false);
+    } catch (erro) {
+      avisarErro(erro, "Não foi possível salvar os dados de acesso.");
+    } finally {
       setIsChangeAccess(false);
-      return;
     }
-
-    getCalls();
-
-    setIsChangeAccess(false);
-    setOpenModal2(false);
   }
 
   async function updateChamadoTarefa() {
-    setLoadingOs(true);
-
-    try {
-      if (!selectedTask) {
-        showAlert("Selecione uma tarefa!", "warning");
-        return;
-      }
-
-      let result = await lerJsonOuMostrarErro(
-        await fetch("/api/insert-task", {
-          method: "POST",
-          body: JSON.stringify({
-            COD_CHAMADO: selectedCall?.COD_CHAMADO,
-            COD_TAREFA: selectedTask,
-          }),
-        }),
-      );
-
-      if (!result) return;
-
-      if (selectedCall) {
-        let call = {
-          ...selectedCall,
-          CODTRF_CHAMADO: selectedTask,
-        };
-        await startCall(call);
-      }
-
-      setModalTarefa(false);
-    } finally {
-      setLoadingOs(false);
+    if (!selectedTask) {
+      showAlert("Selecione uma tarefa!", "warning");
+      return;
     }
+
+    const vinculada = await tentar(() =>
+      vincularTarefa.mutateAsync({
+        codChamado: selectedCall?.COD_CHAMADO,
+        codTarefa: selectedTask,
+      }),
+    );
+    if (!vinculada.ok) return;
+
+    if (selectedCall) {
+      let call = {
+        ...selectedCall,
+        CODTRF_CHAMADO: selectedTask,
+      };
+      await startCall(call);
+    }
+
+    setModalTarefa(false);
   }
 
   async function updateClassificacao() {
-    setLoadingOs(true);
-
-    try {
-      if (!selectedClassificacao) {
-        showAlert("Selecione uma classificação!", "warning");
-        return;
-      }
-
-      let result = await lerJsonOuMostrarErro(
-        await fetch("/api/insert-classificacao", {
-          method: "POST",
-          body: JSON.stringify({
-            COD_CHAMADO: selectedCall?.COD_CHAMADO,
-            COD_CLASSIFICACAO: selectedClassificacao,
-          }),
-        }),
-      );
-
-      if (!result) return;
-
-      if (selectedCall) {
-        let call = {
-          ...selectedCall,
-          CODTRF_CHAMADO: selectedTask,
-        };
-        await startCall(call);
-      }
-
-      setModalClassificacao(false);
-    } finally {
-      setLoadingOs(false);
+    if (!selectedClassificacao) {
+      showAlert("Selecione uma classificação!", "warning");
+      return;
     }
-  }
 
-  useEffect(() => {
-    if (!selectedCall) return;
-
-    getAllOs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCall]);
-
-  useEffect(() => {
-    if (!selectedProj) return;
-
-    getAllOsTarefa();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProj]);
-
-  useEffect(() => {
-    if (!session) return;
-
-    setLoadingTables(true);
-    Promise.all([getCalls(), getTasksProject()]).finally(() =>
-      setLoadingTables(false),
-    );
-    getLimitDate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
-
-  function getLimitDate() {
-    let tomorrow = new Date(`${agoraNoFuso().data}T00:00`);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    setTomorrow(tomorrow);
-
-    fetch("/api/os/valid", {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-      body: JSON.stringify({
-        recurso: session?.user.recurso,
+    const vinculada = await tentar(() =>
+      vincularClassificacao.mutateAsync({
+        codChamado: selectedCall?.COD_CHAMADO,
+        codClassificacao: selectedClassificacao,
       }),
-    })
-      .then((res) => res.json())
-      .then((res) => {
-        if (res[0].PERMAPO_RECURSO === "SIM") {
-          setLimitDate(new Date(res[0].DTLIMITE_RECURSO));
-        } else {
-          let date = new Date(`${agoraNoFuso().data}T00:00`);
-          date.setDate(date.getDate() - 1);
-          setLimitDate(date);
-        }
-      })
-      .catch(() => {
-        setLoadingOs(false);
-      });
+    );
+    if (!vinculada.ok) return;
+
+    if (selectedCall) {
+      let call = {
+        ...selectedCall,
+        CODTRF_CHAMADO: selectedTask,
+      };
+      await startCall(call);
+    }
+
+    setModalClassificacao(false);
   }
 
   async function handleDelete(os: any) {
@@ -828,32 +593,11 @@ export default function Home() {
       return;
     }
 
-    setLoadingOs(true);
-
-    const responseDelete = await fetch("/api/os/delete", {
-      method: "POST",
-      body: JSON.stringify({
-        codOs: os.COD_OS,
-      }),
-    });
-    const result = await responseDelete.json();
-
-    setLoadingOs(false);
-
-    if (!responseDelete.ok) {
-      showAlert(
-        result?.error ?? "Não foi possível excluir o apontamento.",
-        "warning",
-      );
-      return;
-    }
-
-    if (tab === "chamado") {
-      getCalls();
-      getAllOs(selectedDate);
-    } else {
-      recarregarOsDaAbaTarefas();
-    }
+    // As listas (OS, painel e, na aba Chamados, os chamados) se atualizam sozinhas.
+    await tentar(
+      () => excluir.mutateAsync({ codOs: os.COD_OS, recarregarChamados: tab === "chamado" }),
+      "Não foi possível excluir o apontamento.",
+    );
   }
 
   async function updateOs() {
@@ -884,41 +628,16 @@ export default function Home() {
 
     setIsProcessing(true);
     try {
-      const responseUpdate = await fetch("/api/os/update", {
-        method: "POST",
-        body: JSON.stringify({
+      await atualizar.mutateAsync({
+        recarregarChamados: tab === "chamado",
+        corpo: {
           codOs: selectedOs.COD_OS,
           description,
           date,
           startTime: hours.initial,
           endTime: hours.final,
-        }),
+        },
       });
-      const result = await responseUpdate.json();
-
-      if (!responseUpdate.ok) {
-        showAlert(
-          result?.error ??
-            `Não foi possível salvar as alterações da OS #${selectedOs.COD_OS}. Tente novamente.`,
-          "warning",
-        );
-        return;
-      }
-
-      if (!result) {
-        showAlert(
-          `Não foi possível salvar as alterações da OS #${selectedOs.COD_OS}. Tente novamente.`,
-          "error",
-        );
-        return;
-      }
-
-      if (tab === "chamado") {
-        getCalls();
-        getAllOs(selectedDate);
-      } else {
-        recarregarOsDaAbaTarefas();
-      }
 
       closeEditOsModal(false);
       showAlert(
@@ -926,10 +645,10 @@ export default function Home() {
         "success",
       );
       setSelectedOs(null);
-    } catch {
-      showAlert(
-        `Não foi possível salvar as alterações da OS #${selectedOs.COD_OS}. Verifique sua conexão e tente novamente.`,
-        "error",
+    } catch (erro) {
+      avisarErro(
+        erro,
+        `Não foi possível salvar as alterações da OS #${selectedOs.COD_OS}. Tente novamente.`,
       );
     } finally {
       setIsProcessing(false);
@@ -973,7 +692,7 @@ export default function Home() {
           <span className="block w-20 h-1.5 rounded-full bg-gradient-to-r from-[#0f3d63] to-cyan-400" />
         </div>
 
-        <section className="flex flex-row w-full max-w-md mx-auto bg-slate-300 dark:bg-slate-700 rounded-full p-1 mt-4">
+        <section className="flex flex-row w-full max-w-xl mx-auto bg-slate-300 dark:bg-slate-700 rounded-full p-1 mt-4">
           <button
             onClick={() => changeTab("chamado")}
             className={
@@ -994,7 +713,56 @@ export default function Home() {
           >
             Tarefas
           </button>
+          <button
+            onClick={() => changeTab("painel")}
+            className={
+              tab === "painel"
+                ? "flex-1 bg-[#0f3d63] dark:bg-[#081c2e] text-white rounded-full py-2 text-sm font-semibold transition depth-btn"
+                : "flex-1 text-slate-600 dark:text-slate-300 rounded-full py-2 text-sm font-semibold transition hover:text-slate-900 dark:hover:text-white"
+            }
+          >
+            Meu Painel
+          </button>
         </section>
+
+        <AvisoChamadosNovos onVer={() => changeTab("chamado")} />
+
+        {tab !== "painel" && (
+          <AvisoDiasPendentes onApontarEm={painelApontarEm} onVerPainel={() => changeTab("painel")} />
+        )}
+
+        {apontamentoSugerido && tab !== "painel" && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-3 w-full max-w-xl mx-auto rounded-xl border border-green-700 dark:border-green-400 bg-green-50 dark:bg-green-950/40 px-4 py-2.5"
+          >
+            <p className="text-sm font-semibold text-green-800 dark:text-green-300">
+              Apontamento em {apontamentoSugerido.data.split("-").reverse().join("/")}
+              {apontamentoSugerido.inicio && ` das ${apontamentoSugerido.inicio} às ${apontamentoSugerido.fim}`}:{" "}
+              {tab === "os"
+                ? "clique no relógio da tarefa para continuar."
+                : "para apontar nesse dia, use a aba Tarefas."}
+            </p>
+            <button
+              type="button"
+              onClick={cancelarApontamentoSugerido}
+              className="rounded-md border border-green-800 dark:border-green-400 px-3 py-1 text-xs font-semibold text-green-800 dark:text-green-300 cursor-pointer transition hover:bg-green-100 dark:hover:bg-green-900/50 outline-none focus-visible:ring-2 focus-visible:ring-green-600"
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
+
+        {tab === "painel" ? (
+          <PainelAba
+            onApontarEm={painelApontarEm}
+            onIrParaChamado={painelIrParaChamado}
+            onIrParaTarefa={painelIrParaTarefa}
+            onVerOsDoDia={painelVerOsDoDia}
+            onErro={(mensagem) => showAlert(mensagem, "warning")}
+          />
+        ) : (
+          <>
 
         <div className="flex flex-col gap-2">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
@@ -1046,6 +814,8 @@ export default function Home() {
             </h2>
             <OsListTable onDelete={handleDelete} />
           </div>
+        )}
+          </>
         )}
       </div>
     </main>

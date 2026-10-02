@@ -1,118 +1,45 @@
-import { ChamadosType, STATUS_CHAMADO } from "@/types/chamados";
-import { Firebird, getConnection } from "../firebird";
+import { STATUS_CHAMADO } from "@/types/chamados";
+import { ErroDeRegra } from "../erro-regra";
+import { gravarEmSerie, proximoCodigo } from "../transacao";
 
+// Iniciar o chamado: status "Em atendimento" + registro no histórico. Tudo numa
+// transação só; o número do histórico é lido dentro dela (ver services/transacao.ts).
 export default async function StartCallService(codChamado: string): Promise<boolean> {
 
+    await gravarEmSerie(async (tx) => {
 
-    return new Promise(async (resolve, reject) => {
+        const newID = await proximoCodigo(tx, "HISTCHAMADO", "COD_HISTCHAMADO")
 
-        let db: any = null
+        const [chamado] = await tx.consultar(`SELECT DTINI_CHAMADO FROM CHAMADO WHERE COD_CHAMADO = ?`, [codChamado])
 
-        try {
+        if (!chamado) throw new ErroDeRegra("Chamado não encontrado.")
 
-            db = await new Promise((resolve, reject) => {
-                getConnection( (err: any, db: any) => {
-                    if (err) {
-                        return reject(err)
-                    }
-                    return resolve(db)
-                })
-            })
-
-            const newID: number = await new Promise((resolve, reject) => {
-
-                db.query(`SELECT MAX(COD_HISTCHAMADO) + 1 as ID FROM HISTCHAMADO`,
-                    [], async function (err: any, res: any) {
-                        if (err) {
-                            db?.detach()
-                            return reject(err);
-                        }
-                        return resolve(res[0]['ID'])
-                    })
-            })
-
-            const chamado = await new Promise<ChamadosType>((resolve, reject) => {
-                db.query(`SELECT * FROM CHAMADO WHERE COD_CHAMADO = ?`,
-                    [codChamado], async function (err: any, res: ChamadosType[]) {
-                        if (err) {
-                            db?.detach()
-                            return reject(err);
-                        }
-                        return resolve(res[0])
-                    })
-            })
-
-
-            let dataIniChamado = chamado['DTINI_CHAMADO']??'';
-            if (dataIniChamado == '' || dataIniChamado == null) {
-                dataIniChamado = new Date().toLocaleString('pt-br', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replaceAll('/', '.').replaceAll(',', '');
-            }
-
-            const transaction: any = await new Promise((resolve, reject) => {
-                db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err: any, transaction: any) => {
-                    if (err) {
-                        db?.detach()
-                        return reject(err)
-                    }
-                    return resolve(transaction)
-                })
-            })
-
-
-            await new Promise((resolve, reject) => {
-
-                transaction.query(`
-                        UPDATE CHAMADO SET STATUS_CHAMADO = ? , DTINI_CHAMADO = ? WHERE COD_CHAMADO = ? AND STATUS_CHAMADO <> ?`,
-                    [STATUS_CHAMADO["EM ATENDIMENTO"], dataIniChamado, codChamado, STATUS_CHAMADO.FINALIZADO], async function (err: any, result: any) {
-                        if (err) {
-                            db?.detach()
-                            transaction.rollback();
-                            return reject(err)
-                        }
-
-                        return resolve(true)
-                    });
-
-            })
-
-            await new Promise((resolve, reject) => {
-                transaction.query(`INSERT INTO HISTCHAMADO (COD_HISTCHAMADO, COD_CHAMADO, DATA_HISTCHAMADO, HORA_HISTCHAMADO, DESC_HISTCHAMADO) VALUES (?, ?, ?, ?, ?)`,
-                    [
-                        newID,
-                        codChamado,
-                        new Date().toLocaleString('pt-br', { year: 'numeric', month: '2-digit', day: '2-digit' }).replaceAll('/', '.').replaceAll(',', ''),
-                        new Date().toLocaleString('pt-br', { hour: '2-digit', minute: '2-digit' }).replaceAll(':', ''),
-                        STATUS_CHAMADO["EM ATENDIMENTO"]
-                    ], async function (err: any, result: any) {
-
-                        if (err) {
-                            transaction.rollback();
-                            db?.detach()
-                            return reject(err)
-                        }
-
-                        return resolve(true)
-
-                        
-                    });
-            })
-
-            transaction.commit((err: Error) => {
-                if (err) {
-                    transaction.rollback();
-                    return reject(err)
-                }
-                else {
-                    db?.detach();
-                    return resolve(true)
-                }
-
-            });
-
-
-        } catch (err) {
-            db?.detach();
-            return reject(err)
+        let dataIniChamado = chamado['DTINI_CHAMADO'] ?? '';
+        if (dataIniChamado == '' || dataIniChamado == null) {
+            dataIniChamado = new Date().toLocaleString('pt-br', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replaceAll('/', '.').replaceAll(',', '');
         }
+
+        await tx.executar(`
+                UPDATE CHAMADO SET STATUS_CHAMADO = ? , DTINI_CHAMADO = ? WHERE COD_CHAMADO = ? AND STATUS_CHAMADO <> ?`,
+            [STATUS_CHAMADO["EM ATENDIMENTO"], dataIniChamado, codChamado, STATUS_CHAMADO.FINALIZADO])
+
+        await tx.executar(`INSERT INTO HISTCHAMADO (COD_HISTCHAMADO, COD_CHAMADO, DATA_HISTCHAMADO, HORA_HISTCHAMADO, DESC_HISTCHAMADO) VALUES (?, ?, ?, ?, ?)`,
+            [
+                newID,
+                codChamado,
+                new Date().toLocaleString('pt-br', { year: 'numeric', month: '2-digit', day: '2-digit' }).replaceAll('/', '.').replaceAll(',', ''),
+                new Date().toLocaleString('pt-br', { hour: '2-digit', minute: '2-digit' }).replaceAll(':', ''),
+                STATUS_CHAMADO["EM ATENDIMENTO"]
+            ])
+
+        return newID
+    }, {
+        confirmar: async (codHist, consultar) => {
+            const [r] = await consultar(`SELECT COUNT(*) AS N FROM HISTCHAMADO WHERE COD_HISTCHAMADO = ? AND COD_CHAMADO = ?`, [codHist, codChamado])
+
+            return Number(r?.N) === 1
+        },
     })
+
+    return true
 }

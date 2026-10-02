@@ -257,3 +257,14 @@ alerta da tela. Nada é gravado quando alguma regra falha.
     src/services/tarefa/valid-hours.ts ....................... horas do mês (tarefa)
     src/services/call/valid-hours.ts ......................... horas do mês (chamado)
     src/services/call/change-status.ts ....................... regras de status
+
+
+GRAVAÇÃO SIMULTÂNEA E COMMIT (02/10/2026)
+-----------------------------------------
+  Clique duplo no mesmo horário, dois consultores gravando ao mesmo tempo e
+  gravações respondidas antes do commit foram tratados em services/transacao.ts.
+  Resumo: as gravações do sistema web andam em fila, o número novo é lido dentro
+  da transação, a conferência de horário ocupado roda de novo colada ao INSERT
+  e, depois do commit, o sistema confirma que a linha existe. Detalhes, achado
+  sobre o driver do Firebird e como rodar os testes de integração em
+  docs/gravacoes-no-banco.txt.

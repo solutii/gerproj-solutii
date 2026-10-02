@@ -28,13 +28,13 @@ test.describe("Home (autenticado)", () => {
         test.skip(!hasRow, "Nenhum chamado disponível pra este usuário de teste");
 
         await firstRow.click();
-        await expect(page.getByText(/Apontamentos do chamado/)).toBeVisible();
+        await expect(page.getByText(/OS's do chamado/i)).toBeVisible();
 
         await page.getByRole("button", { name: "Tarefas" }).click();
-        await expect(page.getByText(/Apontamentos do chamado/)).toHaveCount(0);
+        await expect(page.getByText(/OS's do chamado/i)).toHaveCount(0);
 
         await page.getByRole("button", { name: "Chamados" }).click();
-        await expect(page.getByText(/Apontamentos do chamado/)).toHaveCount(0);
+        await expect(page.getByText(/OS's do chamado/i)).toHaveCount(0);
     });
 
     test("clicar duas vezes no mesmo chamado desmarca a seleção (toggle)", async ({ page }) => {
@@ -44,10 +44,10 @@ test.describe("Home (autenticado)", () => {
         test.skip(!hasRow, "Nenhum chamado disponível pra este usuário de teste");
 
         await firstRow.click();
-        await expect(page.getByText(/Apontamentos do chamado/)).toBeVisible();
+        await expect(page.getByText(/OS's do chamado/i)).toBeVisible();
 
         await firstRow.click();
-        await expect(page.getByText(/Apontamentos do chamado/)).toHaveCount(0);
+        await expect(page.getByText(/OS's do chamado/i)).toHaveCount(0);
     });
 
     test("o toggle de tema alterna entre claro e escuro", async ({ page }) => {

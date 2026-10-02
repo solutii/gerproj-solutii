@@ -15,6 +15,7 @@ import {
   formatarHoraBanco,
   horariosSeSobrepoem,
 } from "@/utils/regras-apontamento";
+import type { Tx } from "../transacao";
 
 export const MENSAGEM_FORA_DO_PERIODO = "Selecione uma data dentro do período vigente.";
 
@@ -95,11 +96,17 @@ export async function validarApontamento({
 
   if (dia < (await dataMinima(recurso))) throw new ErroDeRegra(MENSAGEM_FORA_DO_PERIODO);
 
-  const existentes = await consultar(
-    "SELECT COD_OS, HRINI_OS, HRFIM_OS FROM OS WHERE CODREC_OS = ? AND DTINI_OS = ?",
-    [recurso, dia],
-  );
+  const existentes = await consultar(SQL_OS_DO_DIA, [recurso, dia]);
 
+  lancarSeHouverConflito(existentes, { startTime, endTime, ignorarCodOs });
+}
+
+const SQL_OS_DO_DIA = "SELECT COD_OS, HRINI_OS, HRFIM_OS FROM OS WHERE CODREC_OS = ? AND DTINI_OS = ?";
+
+function lancarSeHouverConflito(
+  existentes: any[],
+  { startTime, endTime, ignorarCodOs }: { startTime: string; endTime: string; ignorarCodOs?: number | string },
+): void {
   const conflito = existentes.find(
     (os) =>
       String(os.COD_OS) !== String(ignorarCodOs ?? "") &&
@@ -111,6 +118,21 @@ export async function validarApontamento({
       `Conflito de horário: você já tem o apontamento da OS #${conflito.COD_OS} das ${formatarHoraBanco(conflito.HRINI_OS)} às ${formatarHoraBanco(conflito.HRFIM_OS)} nesta data.`,
     );
   }
+}
+
+// Mesma conferência, mas DENTRO da transação que vai gravar, logo antes do
+// INSERT/UPDATE. A conferência de validarApontamento acontece antes de uma
+// série de outras consultas; entre ela e a gravação dois cliques seguidos (ou
+// duas abas) passariam os dois. Aqui a janela é de milissegundos e, como a
+// leitura espera qualquer gravação ainda não confirmada, o segundo clique já
+// enxerga o primeiro.
+export async function conferirConflitoNaTransacao(
+  tx: Tx,
+  { recurso, date, startTime, endTime, ignorarCodOs }: Pick<Apontamento, "recurso" | "date" | "startTime" | "endTime" | "ignorarCodOs">,
+): Promise<void> {
+  const existentes = await tx.consultar(SQL_OS_DO_DIA, [recurso, date.slice(0, 10)]);
+
+  lancarSeHouverConflito(existentes, { startTime, endTime, ignorarCodOs });
 }
 
 export type OsDoConsultor = {

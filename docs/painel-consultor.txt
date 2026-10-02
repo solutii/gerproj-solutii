@@ -1,0 +1,154 @@
+MEU PAINEL (dashboard do consultor) - gerproj-solutii
+======================================================
+
+Data: 02/10/2026
+
+O QUE É
+-------
+Uma terceira aba na tela inicial, ao lado de "Chamados" e "Tarefas", com dados
+sobre o trabalho do próprio consultor. É só LEITURA (não grava nada) e cada
+consultor vê SOMENTE os seus dados (o consultor vem da sessão de login).
+
+Dá para navegar pelos meses (setas "‹" e "›"; "Voltar ao mês atual").
+
+
+OS BLOCOS E COMO CADA NÚMERO É CALCULADO
+----------------------------------------
+
+1. MEU MÊS
+   - Horas apontadas: soma de (hora fim - hora início) de todas as suas OS no mês.
+   - Meta do mês: jornada diária do consultor (campo HRDIA_RECURSO, ex.: 8h48) x
+     dias úteis do mês.
+   - Dias úteis: segunda a sexta, menos os feriados NACIONAIS (fixos e móveis:
+     Carnaval, Sexta-feira Santa, Corpus Christi). Feriados estaduais/municipais
+     não entram (o banco não tem cadastro de feriados).
+   - No mês corrente mostra também a "meta até hoje" e quanto falta/sobra.
+   - Dias úteis sem apontamento: dias úteis JÁ PASSADOS (o dia de hoje não conta)
+     em que você não lançou nenhuma OS.
+   - "Você pode apontar a partir de dd/mm/aaaa": a data limite de apontamento.
+
+2. PENDÊNCIAS
+   - Chamados sem apontamento há mais de 7 dias: chamados abertos (não
+     finalizados) cuja última OS (ou, sem OS, o início/envio do chamado) foi há
+     mais de 7 dias corridos. Mostra os 10 mais antigos.
+   - Tarefas no limite ou sem horas (situação de HOJE, mês corrente):
+       * "no limite": tarefa com limite mensal (LIMMES_TAREFA > 0) com 80% ou mais
+         consumido por TODAS as OS dela no mês (de todos os consultores);
+       * "sem horas": tarefa da aba Tarefas com HRREAL_TAREFA = 0 que não permite
+         exceder (PERIMP_TAREFA diferente de "SIM"): o apontamento é recusado.
+   - OS contestadas pelo cliente: OS do mês em que o cliente marcou que NÃO
+     concorda em pagar (VALCLI_OS = "NAO", feito no portal do cliente).
+
+3. ONDE MEU TEMPO VAI
+   - Horas por dia: verde = bateu a jornada do dia; âmbar = abaixo (inclui dias
+     sem OS e fins de semana); linha tracejada = jornada.
+   - Horas por tipo de chamado: pela classificação do chamado; OS de tarefa (sem
+     chamado) ficam em "Tarefa (sem chamado)".
+   - Horas por cliente e por tarefa: os 8 maiores; o resto agrupa em "Outros".
+   - Evolução: horas dos últimos 6 meses (barras) contra a meta de cada mês
+     (pontos); o mês selecionado fica em destaque.
+   Cada gráfico tem "Ver em tabela" com os mesmos números em texto.
+
+4. RESULTADO
+   - SLA dos meus chamados: chamados FINALIZADOS no mês. Tempo = do envio do
+     chamado (DTENVIO_CHAMADO) até a finalização (último evento FINALIZADO do
+     histórico), contado só em horas úteis (8h às 18h, segunda a sexta, sem
+     feriados nacionais). No prazo se <= SLA da tarefa do chamado (SLA_TAREFA,
+     em horas). Chamado sem SLA (vazio ou 0) fica de fora da conta.
+   - Faturamento das minhas horas: horas faturáveis x não faturáveis (campo
+     FATURADO_OS, que vem do cadastro da tarefa) e quanto já foi efetivamente
+     faturado (COD_FATURAMENTO preenchido).
+   - Avaliações dos clientes: média das notas dos seus chamados avaliados
+     (AVALIA_CHAMADO maior que 1; o valor 1 significa "não avaliado") e os
+     últimos comentários. Sem avaliações: "Ainda sem avaliações".
+
+5. BLOCOS ACRESCENTADOS DEPOIS (2ª etapa)
+  Projeção do mês (dentro de "Meu mês", só no mês corrente)
+      Média por dia útil já decorrido (hoje só conta se já tem OS) × dias úteis
+      restantes + horas já apontadas. Mostra se fecha dentro da meta e, se não,
+      quanto falta por dia útil restante.
+  Hoje
+      OS lançadas hoje, quanto falta para a jornada e horários livres (grade
+      de 30 em 30 min, 8h-18h, só até o horário atual). Independe do mês exibido.
+  Meus chamados em aberto
+      Quantidade por status, os mais antigos em aberto e os aguardando validação
+      do cliente (dias desde a última finalização registrada no histórico).
+  Minhas tarefas: estimado x lançado
+      Horas lançadas (todos os consultores, desde o início) contra as horas
+      estimadas da tarefa, e prazo previsto. Prazo vencido é só informativo
+      (há tarefas antigas com prazos de anos atrás).
+  Comparado ao mês anterior
+      Horas, nº de OS e SLA. No mês em andamento compara até o MESMO dia útil do
+      mês anterior; em mês fechado, mês inteiro contra mês inteiro.
+  Espelho do mês (botões no topo)
+      GET /api/painel/espelho?mes=AAAA-MM. "Baixar Excel (CSV)": separador ";",
+      UTF-8 com BOM, proteção contra fórmulas. "Imprimir / salvar PDF": abre o
+      diálogo de impressão do navegador (sem dependência nova).
+
+  Aviso de dias sem apontamento (faixa âmbar nas abas Chamados e Tarefas)
+      GET /api/painel/pendentes: dias úteis dos últimos 14 dias (hoje não conta)
+      sem nenhuma OS e que ainda podem ser apontados (respeita o limite de
+      apontamento do consultor). Atualiza ao abrir a Home e ao fechar os modais
+      de apontamento (o aviso se atualiza sozinho quando um apontamento é
+      gravado ou excluído). "Apontar em dd/mm" abre o dia mais antigo; "Dispensar"
+      esconde até recarregar a página.
+  Atualização do painel
+      Os dados ficam em cache (TanStack Query, ver docs/tanstack-query.txt):
+      trocar de aba ou de mês e voltar não busca de novo enquanto o dado tem
+      menos de 1 minuto. Passado isso, atualiza em segundo plano ao voltar para
+      a janela. Qualquer apontamento gravado, editado ou excluído marca o painel
+      como velho, e ele é buscado de novo na próxima vez que for aberto.
+  Espelho: o cabeçalho do PDF/impressão traz a meta do mês (jornada x dias
+      úteis) e o percentual apontado.
+  Elementos clicáveis do painel têm tooltip dizendo o que o clique faz.
+
+  ATALHOS (o painel leva até a ação)
+      Dia útil sem apontamento / horário livre / "Apontar hoje": vai para a aba
+      Tarefas e deixa data (e horário) já definidos; um aviso verde lembra de
+      clicar no relógio da tarefa (botão Cancelar desfaz). Dias anteriores ao
+      limite de apontamento ficam desabilitados.
+      Chamados parados / mais antigos / aguardando: abre a aba Chamados com a
+      linha selecionada. Tarefas em alerta e em andamento: abre a aba Tarefas
+      (só as que aparecem nela). OS contestada: lista as OS daquele dia.
+
+CAMPOS QUE NÃO SÃO USADOS (de propósito)
+  - PRODUTIVO_OS: é "SIM" em todas as OS, então não diz nada.
+  - PRIOR_CHAMADO (prioridade): valores inconsistentes.
+
+
+COMO FOI FEITO
+--------------
+  Tela ........ src/app/(pages)/home/_components/painel/  (aba na Home)
+  Gráficos .... src/components/graficos/  - @tanstack/charts, renderizador CANVAS
+                (nada em SVG). O pacote é novo: "@tanstack/charts" 0.18.0.
+  API ......... GET /api/painel?mes=AAAA-MM   (src/app/api/painel/route.ts)
+                sessão obrigatória; "mes" validado (AAAA-MM, até o mês atual).
+  Consultas ... src/services/painel/index.ts (só SELECT)
+  Regras ...... src/utils/painel/  (funções puras e testadas: feriados, dias
+                úteis, horas úteis/SLA, agregações, meta, pendências)
+  Projeto ..... docs/superpowers/specs/2026-10-02-painel-consultor-design.md
+
+  Espelho: src/services/painel/espelho.ts + src/utils/painel/espelho.ts (CSV/HTML).
+
+  Testes de tela: home/_components/painel/*.test.tsx (renderização com react-dom
+  + act, sem biblioteca extra; dados de exemplo em painel.fixture.tsx).
+
+  Testes: src/utils/painel/*.test.ts, src/services/painel/index.test.ts (banco
+  simulado, com números conferidos à mão) e src/app/api/painel/route.test.ts.
+
+
+AO SUBIR PARA O SERVIDOR
+------------------------
+  A dependência nova (@tanstack/charts) muda package.json e pnpm-lock.yaml:
+  siga o roteiro de rotina_deploy/rotina_deploy.txt (copiar os DOIS arquivos e
+  rodar "pnpm install --frozen-lockfile --prod" no servidor) e docs/upgrade-next15.txt.
+
+
+LIMITAÇÕES CONHECIDAS
+---------------------
+  - Feriados locais não entram na conta de dias úteis.
+  - O SLA mede o tempo total até a finalização, inclusive o tempo em que o
+    chamado ficou aguardando validação do cliente.
+  - "Tarefas no limite" considera o mês corrente, mesmo ao navegar para outro mês.
+  - O painel é "foto do momento": atualiza ao abrir a aba ou trocar de mês (sem
+    atualização automática).

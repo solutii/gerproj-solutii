@@ -2,6 +2,7 @@
 
 import { TbEdit } from "react-icons/tb";
 import { useHomeStore } from "@/stores/home-store";
+import { useHorariosOcupados } from "@/hooks/queries/leituras";
 import { descricaoInvalida } from "@/utils/descricao-apontamento";
 import { mensagemConfirmacaoApontamento } from "@/utils/intervalo-horas";
 import ApontamentoModalLayout from "./ApontamentoModalLayout";
@@ -15,13 +16,17 @@ type Props = {
 export default function EditOsModal({ action }: Props) {
   const { modalEditOS, description, hours, date, selectedOs } = useHomeStore();
 
+  // Conflito com outra OS do dia: trava o botão (o servidor também recusa).
+  const { conflito } = useHorariosOcupados(modalEditOS);
+
   if (!modalEditOS) return null;
 
   const isFormValid =
     !descricaoInvalida(description) &&
     hours.initial !== "" &&
     hours.final !== "" &&
-    date !== "";
+    date !== "" &&
+    !conflito;
 
   return (
     <ApontamentoModalLayout

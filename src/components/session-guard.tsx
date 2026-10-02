@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { useAlertStore } from "@/stores/alert-store";
+import { limparCacheDoUsuario } from "@/lib/query-client";
+import { limparTodosRascunhos } from "@/utils/rascunho";
 
 function urlDaRequisicao(entrada: RequestInfo | URL): string {
   if (typeof entrada === "string") return entrada;
@@ -31,6 +33,8 @@ export default function SessionGuard() {
         },
       );
 
+      limparCacheDoUsuario();
+      limparTodosRascunhos();
       signOut({ callbackUrl: "/login" });
     }
 

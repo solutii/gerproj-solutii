@@ -13,6 +13,7 @@ const handler = NextAuth({
       session({ session, token, user }) {
         session.user.recurso = session.user.email['COD_RECURSO']
         session.user.id = session.user.email['COD_USUARIO']
+        session.user.tipo = session.user.email['TIPO_USUARIO']
         session.user.dataLimite = session.user.email['DTLIMITE_RECURSO']
         session.user.email = ""
         return session 
@@ -56,6 +57,8 @@ const handler = NextAuth({
                   COD_USUARIO: user['COD_USUARIO'],
                   COD_RECURSO: user['COD_RECURSO'],
                   DTLIMITE_RECURSO: user['DTLIMITE_RECURSO'],
+                  // ADM ou USU: decide qual área o usuário enxerga (utils/perfil.ts)
+                  TIPO_USUARIO: String(user['TIPO_USUARIO'] ?? '').trim().toUpperCase(),
                 } as any
 
               }

@@ -1,0 +1,69 @@
+MELHORIAS NA TELA DE APONTAMENTO (02/10/2026)
+=============================================
+
+1. HORÁRIOS OCUPADOS NO MODAL
+   Nos modais Apontamento, StandBy e Editar OS, os horários que cairiam dentro
+   de outra OS do mesmo dia ficam desabilitados e marcados "(ocupado)":
+     - Hora inicial: ocupada se estiver DENTRO de outra OS. Começar exatamente
+       quando outra termina é permitido (encostar não conta).
+     - Hora final: bloqueada se, junto da inicial escolhida, o intervalo
+       atravessasse outra OS.
+   Se mesmo assim houver conflito (ex.: trocou a data depois de escolher as
+   horas), aparece o aviso em vermelho e o botão Confirmar fica desabilitado.
+   Na edição, a própria OS não conta como ocupada.
+   É a MESMA regra que o servidor aplica ao gravar (src/utils/regras-apontamento,
+   horariosSeSobrepoem); um teste varre todas as combinações de meia hora para
+   garantir que as duas concordam. O servidor continua sendo quem decide: se a
+   busca dos horários falhar, a tela não bloqueia nada.
+   Código: utils/horarios-ocupados.ts, hook useHorariosOcupados (leituras.ts).
+   Usa a mesma lista de OS da data que o filtro por data já busca (mesmo cache).
+
+2. REPETIR APONTAMENTO
+   Na lista de OS, o primeiro ícone da coluna Ações (duas folhas) abre o modal
+   certo já com a descrição da OS original, a data de hoje e horários em branco:
+     - OS de chamado -> StandBy do chamado;
+     - OS de tarefa  -> Apontamento na tarefa.
+   Se o chamado/tarefa não estiver mais na lista do consultor (finalizado,
+   reatribuído), aparece um aviso explicando. O ícone existe também em OS fora do
+   período (só editar/excluir ficam restritos). Para isso a lista de OS passou a
+   trazer CHAMADO_OS e CODTRF_OS (consulta só de leitura).
+   Código: utils/repetir-apontamento.ts, homeActions.repetirApontamento.
+
+3. RASCUNHO DA DESCRIÇÃO
+   Se o modal de Apontamento ou StandBy for fechado sem gravar (Cancelar, X),
+   o texto digitado volta ao reabrir o MESMO chamado/tarefa, com o aviso
+   "Rascunho recuperado...". Fica só no navegador (localStorage), vale 24 horas,
+   é apagado ao gravar e ao sair do sistema / sessão expirada. Editar OS não usa
+   rascunho. Se o navegador bloquear o armazenamento, simplesmente não há
+   rascunho (nada quebra).
+   Código: utils/rascunho.ts, CamposApontamento.
+
+4. AVISO DE CHAMADO NOVO
+   Faixa azul na Home: "Chegou um chamado novo para você: #NNNN" com os botões
+   Ver chamados e Dispensar. A lista é conferida a cada 3 minutos com a aba
+   visível (ver docs/tanstack-query.txt); a primeira lista carregada é só a
+   base, então abrir a Home nunca avisa dos chamados que já existiam.
+   Código: utils/chamados-novos.ts, AvisoChamadosNovos.
+
+5. SEGURANÇA
+   Política de conteúdo (CSP): ver docs/seguranca.txt, item 1.11.
+   (O limite de tentativas de login já existia.)
+
+
+TESTES PONTA A PONTA (Playwright)
+---------------------------------
+  Rodar:  npx playwright test         (o servidor de desenvolvimento em
+          localhost:3001 já deve estar de pé; precisa de E2E_USERNAME e
+          E2E_PASSWORD no .env.local, que NÃO vai para o git nem para o servidor)
+  Eles usam o banco que estiver no .env -- hoje o LOCAL. Nunca aponte o .env para
+  o banco de produção ao rodar.
+  e2e/home.spec.ts        entrar, trocar de aba, selecionar chamado, tema.
+  e2e/requisicoes.spec.ts alternar abas e reabrir o painel NÃO fazem requisição
+                          (garante o cache do TanStack Query).
+  e2e/apontamento.spec.ts grava numa tarefa, vê o horário ocupado, repete, edita
+                          e EXCLUI (esperando a resposta real da exclusão; sempre
+                          apaga o que criou); rascunho da descrição.
+  Os testes que gravam usam um texto com marca "Teste automatizado e2e-..." e
+  apagam o que criaram. Depois de rodar, apague a pasta test-results (os traces
+  de falha podem conter o que foi digitado no login).
+  Se um teste for interrompido no meio, procure OS com essa marca no banco local.

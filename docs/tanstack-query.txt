@@ -1,0 +1,115 @@
+BUSCA E CACHE DE DADOS (TanStack Query)
+=======================================
+
+POR QUE
+-------
+  Antes, cada tela buscava seus dados com fetch "na mão" e guardava o resultado
+  no Zustand. Resultado: dados repetidos, buscas a cada troca de aba, listas
+  recarregadas depois de cada gravação mesmo quando não estavam na tela.
+  Agora todo dado que vem do servidor passa pelo TanStack Query
+  (@tanstack/react-query 5): ele guarda em cache, junta pedidos iguais e só
+  busca de novo quando o dado ficou velho ou foi invalidado.
+
+
+COMO FUNCIONA, EM POUCAS PALAVRAS
+---------------------------------
+  - LEITURA (useQuery): o dado fica em cache por consultor. Voltar a uma aba
+    ou a uma seleção já vista mostra o dado na hora, sem requisição, enquanto
+    ele estiver "fresco" (1 minuto; 30 s nas listas de OS; 10 min no período
+    de apontamento). Passado o prazo, o dado antigo continua na tela e é
+    atualizado em segundo plano quando a tela é usada de novo (ex.: voltar para
+    a janela do navegador).
+  - GRAVAÇÃO (useMutation): grava e, ao terminar, marca como "velho" só o que
+    ela pode ter mudado (invalidação). O Query refaz a busca APENAS do que está
+    aberto na tela; o resto é buscado quando for aberto. Nada é buscado à toa.
+  - ZUSTAND (useHomeStore): só estado de tela (aba, seleção, modais, campos do
+    formulário). Dados do servidor NÃO ficam mais lá.
+
+
+ONDE ESTÁ CADA COISA
+--------------------
+  src/lib/api.ts              única porta de saída para /api: apiGet/apiPost,
+                              ApiError (mensagem do servidor + status), tratamento
+                              de rede fora do ar.
+  src/lib/api-home.ts         todas as rotas usadas pela Home (leituras,
+                              conferências imediatas e gravações).
+  src/lib/api-painel.ts       rotas do Meu Painel.
+  src/lib/query-client.ts     configuração do cache (tempo fresco, repetição) e
+                              limpeza no logout.
+  src/providers/query-provider.tsx   liga o Query na aplicação (layout.tsx).
+  src/hooks/queries/chaves.ts        "endereços" do cache (sempre com o consultor).
+  src/hooks/queries/leituras.ts      hooks de leitura: useChamados, useTarefas,
+                                     useOsLista, usePeriodoApontamento, useAreas,
+                                     usePainelDados, usePendentes.
+  src/hooks/queries/mutacoes.ts      hooks de gravação + o que cada uma invalida.
+  src/lib/limite-em-cache.ts  lê o período de apontamento já carregado, para
+                              código que não é componente (validCurrentDate).
+
+
+O QUE CADA GRAVAÇÃO ATUALIZA
+----------------------------
+  Iniciar chamado / alterar status ... chamados + painel
+  Registrar apontamento (tarefa) ...... lista de OS + painel
+  Standby ............................. chamados + lista de OS + painel
+  Editar / excluir OS ................. lista de OS + painel
+                                        (+ chamados quando feito na aba Chamados)
+  Salvar dados de acesso .............. chamados
+  Salvar áreas de atuação ............. áreas
+  (painel = números do mês, "Hoje", pendências e o aviso de dias sem apontamento)
+
+
+ÚNICA BUSCA PERIÓDICA
+---------------------
+  A lista de chamados é conferida a cada 3 minutos (INTERVALO_CHAMADOS_MS em
+  hooks/queries/leituras.ts), SÓ com a aba do navegador visível: em segundo
+  plano o Query pausa sozinho. Serve ao aviso "chegou chamado novo" e mantém a
+  tabela em dia. Para mudar o intervalo (ou desligar, com false), altere essa
+  constante. Todo o resto só busca quando a tela é aberta, fica velha ou é
+  invalidada por uma gravação.
+
+
+REGRAS DE SEGURANÇA DO CACHE
+----------------------------
+  - Erro 4xx (sessão, permissão, parâmetro) NUNCA é repetido; falha de rede e
+    erro 5xx são repetidos uma única vez.
+  - Gravação NUNCA é repetida sozinha (poderia duplicar um apontamento).
+  - Conferências feitas no clique, antes de gravar (limite de horas, tarefa do
+    apontamento, lista de tarefas/classificações do chamado) NÃO usam cache:
+    são sempre frescas.
+  - O cache é por consultor (o recurso está em toda chave) e é LIMPO no logout
+    e quando a sessão expira (limparCacheDoUsuario).
+  - As leituras não usam AbortSignal de propósito: cancelar uma busca quando o
+    usuário sai da tela só faria a mesma busca ser repetida quando ele voltasse.
+  - Sessão expirada (401): continua tratada pelo SessionGuard, que observa o
+    fetch.
+
+
+COMO ACRESCENTAR UMA TELA OU ROTA NOVA
+--------------------------------------
+  1. Escreva a chamada em src/lib/api-*.ts (usando apiGet/apiPost).
+  2. Leitura: crie o hook em leituras.ts com uma chave em chaves.ts (inclua o
+     consultor) e use o hook no componente.
+     Gravação: crie o hook em mutacoes.ts e, no onSuccess, invalide o grupo
+     afetado (invalidar.chamados / os / painel / areas).
+  3. NÃO chame fetch direto no componente e NÃO copie dado do servidor para o
+     Zustand.
+  4. Teste: src/hooks/queries/queries.test.tsx mostra como conferir que não há
+     requisição repetida e que a invalidação atinge só o necessário.
+
+
+COMO CONFERIR AS REQUISIÇÕES
+----------------------------
+  No navegador (F12 > Rede/Network, filtrar por "api"):
+    - abrir a Home: 4 chamadas (pendentes, chamados, tarefas, período);
+    - alternar entre Chamados e Tarefas: nenhuma;
+    - abrir o Meu Painel: 1 chamada na primeira vez; nenhuma ao voltar logo depois;
+    - selecionar um chamado já visto: nenhuma.
+  Em desenvolvimento, uma rota "compilando" pela primeira vez pode demorar
+  vários segundos para responder (só no ambiente de desenvolvimento).
+
+
+AO SUBIR PARA O SERVIDOR
+------------------------
+  A dependência nova (@tanstack/react-query) muda package.json e pnpm-lock.yaml:
+  siga rotina_deploy/rotina_deploy.txt (copiar os DOIS arquivos e rodar
+  "pnpm install --frozen-lockfile --prod" no servidor) e docs/upgrade-next15.txt.

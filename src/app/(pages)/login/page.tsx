@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { destinoSeguro } from "@/utils/callback-url";
+import { destinoAposLogin } from "@/utils/perfil";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FiUser, FiLock, FiEye, FiEyeOff } from "react-icons/fi";
 import { PiSpinnerGap } from "react-icons/pi";
@@ -83,7 +83,9 @@ function LoginForm() {
     // mantém o loading ativo até a navegação de fato acontecer -- só
     // desligamos no caminho de erro acima; aqui o componente fica
     // desmontado assim que o router troca de página.
-    router.push(destinoSeguro(callbackUrl, window.location.origin));
+    // O administrador sempre cai no painel de controle; o consultor, no destino de sempre.
+    const sessao = await getSession();
+    router.push(destinoAposLogin(sessao?.user?.tipo, callbackUrl, window.location.origin));
   }
 
   return (

@@ -6,8 +6,76 @@ Porta:     3000  (acesso: solutii.ddns.net:3000)
 Inicia por: execGerProj.bat  (roda "pnpm start")
 
 
-PASSO A PASSO (toda vez que for colocar alterações no ar)
----------------------------------------------------------
+ROTA AUTOMÁTICA (scripts)  -- criados em 02/10/2026, AINDA NÃO EXECUTADOS
+-------------------------------------------------------------------------
+  Dois scripts em PowerShell (compatíveis com o PowerShell 5.1 do servidor)
+  fazem e CONFEREM os passos abaixo. Só a sintaxe deles foi validada: na primeira
+  vez, rode primeiro "-Verificar" no servidor e confira o que aparece.
+
+  NA SUA MÁQUINA (PowerShell, dentro da pasta do projeto):
+
+      .\rotina_deploy\preparar-pacote.ps1
+
+    - Confere tipos (tsc), lint e testes; se algo falhar, NÃO gera nada.
+    - Gera o build numa CÓPIA temporária (sem node_modules e sem .env), então o
+      seu "pnpm dev" e a sua pasta .next NÃO são tocados.
+    - Monta a pasta  ..\deploy-pacotes\pacote-AAAA-MM-DD_HHMM  com: .next,
+      package.json, pnpm-lock.yaml, pnpm-workspace.yaml, patches, public,
+      next.config.mjs, execGerProj.bat, manifesto.json e o servidor.ps1.
+    - Recusa o pacote se houver .env ou node_modules dentro dele.
+    - Não envia nada ao servidor. Opção: -PularVerificacoes (só o build).
+
+  NO SERVIDOR (copie a pasta do pacote para lá; abra o PowerShell DENTRO dela):
+
+      .\servidor.ps1 -Verificar   só olha e relata; não muda nada. Inclui a
+                                  SITUAÇÃO DE CADA VARIÁVEL do .env, sem mostrar
+                                  valores: ativa (com a linha), SÓ COMENTADA (com a
+                                  linha), ausente, vazia, ou definida mais de uma
+                                  vez; e se o FIREBIRD_HOST é banco "local" ou
+                                  "remoto". Exemplo da saída:
+                                    FIREBIRD_HOST     ativa (linha 14) | banco: remoto
+                                    FIREBIRD_USER     SO COMENTADA (linha 16): NAO esta valendo
+      .\servidor.ps1 -Aplicar     aplica o pacote (veja abaixo)
+      .\servidor.ps1 -Reverter    volta ao último backup
+
+    -Aplicar faz, nesta ordem:
+      1. confere o pacote e o servidor: o mesmo relatório do .env acima (recusa
+         se alguma das 6 variáveis necessárias estiver só comentada, ausente,
+         vazia ou com valores diferentes em mais de um lugar, ou se o
+         FIREBIRD_HOST for banco local), Node 18.18 ou mais, e a porta 3000
+         LIVRE (você precisa fechar a janela do next-server);
+      2. backup do que está no ar em C:\GERPROJ\web-app-2\_backups\<data-hora>
+         (.next, package.json, lock, workspace, patches, next.config, .bat);
+         guarda os 3 mais recentes;
+      3. se package.json / pnpm-lock.yaml / pnpm-workspace.yaml / patches
+         mudaram: copia e roda "pnpm install --frozen-lockfile --prod" e confere
+         o patch dos acentos do node-firebird (precisa dar 2 linhas); se nada
+         mudou, NÃO reinstala;
+      4. apaga o .next antigo, copia o novo e confere o BUILD_ID;
+      5. copia public, next.config.mjs e o execGerProj.bat;
+      6. se QUALQUER passo falhar, volta sozinho ao backup;
+      7. grava um registro em C:\GERPROJ\web-app-2\_deploy.log.
+    NÃO inicia o sistema (a menos que use -Iniciar): abra o execGerProj.bat e
+    confira login, lista de chamados e um apontamento de teste.
+
+    -Reverter volta ao backup mais recente (ou a um específico:
+    -Backup 2026-10-02_153000), reinstalando as dependências se eram outras.
+    Também exige a porta 3000 livre.
+
+  Opções úteis: -AppDir <pasta> (se não for C:\GERPROJ\web-app-2), -Porta <n>,
+  -Iniciar, -Forcar (aceita avisos que interrompem, ex.: .env com localhost),
+  -NaoInstalar (não roda o pnpm install; só para teste).
+  Ajuda completa:  Get-Help .\servidor.ps1 -Full
+
+  Se o PowerShell recusar rodar scripts ("execução de scripts desabilitada"):
+      powershell -ExecutionPolicy Bypass -File .\servidor.ps1 -Verificar
+
+  O que os scripts NUNCA fazem: copiar node_modules, copiar ou editar o .env,
+  usar --no-frozen-lockfile, rodar com o sistema no ar, ou enviar algo à rede.
+
+
+PASSO A PASSO MANUAL (alternativa; toda vez que for colocar alterações no ar)
+-----------------------------------------------------------------------------
 
 NA SUA MÁQUINA (pasta gerproj-solutii):
 
@@ -30,8 +98,23 @@ NO SERVIDOR (C:\GERPROJ\web-app-2):
      Deve aparecer "Ready" e "Local: http://localhost:3000".
 
 
+PAINEL DE ADMINISTRAÇÃO (/admin) - o que muda no deploy
+-------------------------------------------------------
+  - Nenhuma variável nova no .env e nenhuma dependência nova.
+  - Quem é ADM precisa SAIR e ENTRAR de novo depois do deploy (a sessão antiga não
+    tem o tipo de usuário). Consultores não percebem nada.
+  - Os registros de quem alterou o quê ficam em logs\auditoria (criada sozinha).
+    Inclua essa pasta no backup. Os scripts de deploy não mexem em logs.
+  - Detalhes: docs\painel-admin.txt.
+
+
 SÓ QUANDO NECESSÁRIO
 --------------------
+
+  - ATENÇÃO - ATUALIZAÇÃO PARA O NEXT 15 (30/09/2026): o build novo usa Next 15 /
+    React 19. Antes de colocar o .next novo, o servidor PRECISA reinstalar as
+    dependências (passo abaixo); com o node_modules antigo (Next 14) o sistema
+    não sobe. Passo a passo e rollback em docs\upgrade-next15.txt.
 
   - MUDOU DEPENDÊNCIA (adicionou, removeu ou atualizou pacote):
       Copie também package.json e pnpm-lock.yaml (SEMPRE OS DOIS JUNTOS).
@@ -42,7 +125,10 @@ SÓ QUANDO NECESSÁRIO
       Se só mexeu em código, não precisa reinstalar nada.
 
   - MUDOU VARIÁVEL DE AMBIENTE:
-      Edite o .env do servidor (ou copie o .env novo).
+      Edite o .env do servidor, SÓ as linhas que mudaram. NÃO copie o .env da
+      máquina de desenvolvimento: ele pode apontar para o banco LOCAL
+      (FIREBIRD_HOST=localhost, C:\GERPROJ-Local\...), e o do servidor precisa
+      ter o bloco de PRODUÇÃO (FIREBIRD_* do banco do servidor).
       O .env do servidor PRECISA ter:
 
           NEXTAUTH_URL=http://solutii.ddns.net:3000
@@ -72,6 +158,10 @@ REGRAS IMPORTANTES
 
 PROBLEMAS CONHECIDOS
 --------------------
+
+  Sistema não sobe / erro de módulo depois de trocar o .next (versão Next 15)
+    -> Faltou reinstalar as dependências no servidor. Copie package.json e
+       pnpm-lock.yaml e rode: pnpm install --frozen-lockfile --prod
 
   Erro: Cannot find module 'styled-jsx/package.json'
     -> O node_modules foi copiado. Apague e reinstale no servidor:

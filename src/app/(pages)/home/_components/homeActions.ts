@@ -1,5 +1,6 @@
 import { useHomeStore } from "@/stores/home-store";
 import { agoraNoFuso } from "@/utils/horario-futuro";
+import { limiteDeApontamentoEmCache } from "@/lib/limite-em-cache";
 import { ChamadosType } from "@/types/chamados";
 import { TaskType } from "@/types/tarefa";
 
@@ -31,11 +32,11 @@ function stripHtml(html: string): string {
 }
 
 export function changeSelectedCall(chamado: ChamadosType) {
-    const { selectedCall, setSelectedCall, setSelectedProj, setSelectedDate, setListOs } = useHomeStore.getState();
+    const { selectedCall, setSelectedCall, setSelectedProj, setSelectedDate } = useHomeStore.getState();
 
+    // A lista de OS na tela deriva da seleção (useOsLista): desmarcar o chamado a esvazia.
     if (selectedCall?.COD_CHAMADO === chamado.COD_CHAMADO) {
         setSelectedCall(null);
-        setListOs([]);
         return;
     }
 
@@ -45,11 +46,10 @@ export function changeSelectedCall(chamado: ChamadosType) {
 }
 
 export function changeSelectedCallTrf(task: TaskType) {
-    const { selectedProj, setSelectedCall, setSelectedProj, setSelectedDate, setListOs } = useHomeStore.getState();
+    const { selectedProj, setSelectedCall, setSelectedProj, setSelectedDate } = useHomeStore.getState();
 
     if (selectedProj?.COD_TAREFA === task.COD_TAREFA) {
         setSelectedProj(null);
-        setListOs([]);
         return;
     }
 
@@ -114,10 +114,50 @@ export function handleEdit(os: any) {
 // Apontamento, Editar OS) é fechado sem confirmar, pra não deixar um
 // rascunho velho pra próxima vez que o modal abrir.
 function resetApontamentoFields() {
-    const { setDescription, setHours, setDate } = useHomeStore.getState();
+    const { setDescription, setHours, setDate, setApontamentoSugerido } = useHomeStore.getState();
     setDescription("");
     setHours({ initial: "", final: "" });
     setDate(agoraNoFuso().data);
+    setApontamentoSugerido(null);
+}
+
+// Meu Painel: deixa a data (e o horário, se houver) já definidos para o próximo
+// apontamento -- o modal abre com esses valores quando o consultor escolher a
+// tarefa ou o chamado. Fechar o modal sem confirmar volta tudo ao normal.
+export function sugerirApontamento(data: string, inicio: string = "", fim: string = "") {
+    const { setDate, setHours, setApontamentoSugerido } = useHomeStore.getState();
+    setDate(data);
+    setHours({ initial: inicio, final: fim });
+    setApontamentoSugerido({ data, inicio, fim });
+}
+
+// Repetir um apontamento: abre o modal certo (StandBy do chamado ou
+// Apontamento da tarefa) já com a descrição da OS original; data volta a hoje e
+// os horários ficam em branco para o consultor escolher.
+export function repetirApontamento(
+    destino: { tipo: "chamado"; chamado: ChamadosType; descricao: string } | { tipo: "tarefa"; tarefa: TaskType; descricao: string },
+) {
+    const store = useHomeStore.getState();
+
+    store.setApontamentoSugerido(null);
+    store.setHours({ initial: "", final: "" });
+    store.setDate(agoraNoFuso().data);
+    store.setDescription(destino.descricao);
+
+    if (destino.tipo === "chamado") {
+        store.setTab("chamado");
+        selectCallRow(destino.chamado);
+        store.setModalStandby(true);
+    } else {
+        store.setTab("os");
+        selectProjRow(destino.tarefa);
+        store.setModalApontamento(true);
+    }
+}
+
+// Cancela a sugestão do painel (botão do aviso).
+export function cancelarApontamentoSugerido() {
+    resetApontamentoFields();
 }
 
 export function closeStandbyModal(open: boolean) {
@@ -153,7 +193,8 @@ export function closeAccessModal(open: boolean) {
 }
 
 export function validCurrentDate(date: string): boolean {
-    const { limitDate } = useHomeStore.getState();
+    // Período já carregado pelo usePeriodoApontamento (cache do Query).
+    const limitDate = limiteDeApontamentoEmCache();
     const selectedDate = date.length > 10 ? new Date(date) : new Date(date + `T00:00`);
     const tomorrow = new Date(`${agoraNoFuso().data}T00:00`);
     tomorrow.setDate(tomorrow.getDate() + 1);
